@@ -76,6 +76,7 @@
   }
   .card h2 em{font-style:normal;color:var(--ink-3);font-weight:400;font-size:.86em}
   .card h2 .sp{margin-left:auto}
+  .histbtns{margin-left:auto;display:flex;gap:6px;align-items:center}
 
   #drop{
     border:1.5px dashed var(--line-strong);border-radius:14px;flex:1;min-height:20vh;
@@ -449,7 +450,11 @@
   </div>
 
   <div class="card hist">
-    <h2>历史脚本 <em>只存在本机浏览器，不上传</em><button class="ghost mini sp" id="btnClearHist">清空</button></h2>
+    <h2>历史脚本 <em>只在当前标签页，关闭即清空</em>
+      <span class="histbtns"><button class="ghost mini" id="btnExportHist">导出</button>
+      <button class="ghost mini" id="btnImportHist">导入</button>
+      <button class="ghost mini" id="btnClearHist">清空</button></span></h2>
+    <input type="file" id="histFile" accept=".json" style="display:none" />
     <div id="hist"></div>
   </div>
 
@@ -859,7 +864,7 @@ function saveNow(manual){
     rec.updatedAt = Date.now();
     setHist(arr);
   }
-  localStorage.setItem("tyc_blocks", JSON.stringify({ key: currentKey, blocks: snap }));
+  SS.set("tyc_blocks", JSON.stringify({ key: currentKey, blocks: snap }));
   const t = new Date();
   const hh = String(t.getHours()).padStart(2,"0"), mm = String(t.getMinutes()).padStart(2,"0");
   $("saveHint").textContent = (manual ? "已保存 " : "已自动保存 ") + hh + ":" + mm;
@@ -932,11 +937,17 @@ async function generate(lines, titleOverride){
   bi = 0; left = BLOCKS[0].dur; running = false;
   render();
   enterPrompter();
-  localStorage.setItem("tyc_lines", JSON.stringify(lines));
-  localStorage.setItem("tyc_title", title);
+  SS.set("tyc_lines", JSON.stringify(lines));
+  SS.set("tyc_title", title);
   currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""));
 }
 
+/* 历史与当前脚本只存在「当前标签页」：关掉标签即清空，别人再打开看不到 */
+const SS = {
+  get(k){ try { return sessionStorage.getItem(k); } catch(_) { return null; } },
+  set(k,v){ try { sessionStorage.setItem(k,v); } catch(_){} },
+  del(k){ try { sessionStorage.removeItem(k); } catch(_){} }
+};
 /* ================= 5. 历史 ================= */
 const HIST_KEY = "tyc_hist_v1";
 function hashLines(lines){
@@ -947,7 +958,7 @@ function hashLines(lines){
 }
 function getHist(){
   let arr = [];
-  try { arr = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); } catch(_){ return []; }
+  try { arr = JSON.parse(SS.get(HIST_KEY) || "[]"); } catch(_){ return []; }
   // 兼容旧记录：blocks 以前既可能是数量也可能是整份数据
   arr.forEach(x=>{
     if (typeof x.blockCount !== "number"){
@@ -956,7 +967,7 @@ function getHist(){
   });
   return arr;
 }
-function setHist(a){ try { localStorage.setItem(HIST_KEY, JSON.stringify(a)); } catch(_){} }
+function setHist(a){ SS.set(HIST_KEY, JSON.stringify(a)); }
 
 function saveHist(lines, title){
   const arr = getHist();
@@ -983,7 +994,7 @@ function renderHist(){
   const arr = getHist();
   const box = $("hist");
   if (!arr.length){
-    box.innerHTML = '<div class="empty">还没有历史脚本。每次生成会在这里存一条，<b>只保存在你这台电脑的浏览器里</b>，别人打开看不到。</div>';
+    box.innerHTML = '<div class="empty">当前标签页还没有历史脚本。生成后会临时存在这里，<b>关掉标签页即清空</b>；想长期保留请点「导出」存成文件。</div>';
     return;
   }
 
@@ -1014,6 +1025,39 @@ function renderHist(){
   });
 }
 
+$("btnExportHist").onclick = () => {
+  const arr = getHist();
+  if (!arr.length){ alert("还没有历史脚本可以导出。"); return; }
+  const d = new Date();
+  const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0");
+  const blob = new Blob([JSON.stringify(arr, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "arvea-提词历史-" + stamp + ".json";
+  a.click();
+  setTimeout(()=> URL.revokeObjectURL(a.href), 3000);
+};
+
+$("btnImportHist").onclick = () => $("histFile").click();
+$("histFile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const incoming = JSON.parse(await f.text());
+    if (!Array.isArray(incoming)) throw new Error("文件格式不对");
+    const arr = getHist();
+    let added = 0;
+    incoming.forEach(rec=>{
+      if (!rec || !rec.lines) return;
+      if (!rec.id) rec.id = hashLines(rec.lines) + "|" + (rec.title || "");
+      if (!arr.find(x => x.id === rec.id)){ arr.push(rec); added++; }
+    });
+    setHist(arr);
+    renderHist();
+    $("stat").innerHTML = `已导入 <b>${added}</b> 条历史脚本`;
+  }catch(err){
+    $("stat").innerHTML = "<b style='color:#d70015'>导入失败</b>　" + err.message;
+  } finally { e.target.value = ""; }
+};
 $("btnClearHist").onclick = () => {
   if (!getHist().length) return;
   if (!confirm("清空全部历史脚本？此操作不可恢复。")) return;
@@ -1131,10 +1175,10 @@ function loadBlocks(blocks, key){
 function setRail(collapsed){
   $("rail").classList.toggle("collapsed", collapsed);
   $("railToggle").setAttribute("aria-expanded", String(!collapsed));
-  localStorage.setItem("tyc_rail", collapsed ? "1" : "0");
+  SS.set("tyc_rail", collapsed ? "1" : "0");
 }
 $("railToggle").onclick = () => setRail(!$("rail").classList.contains("collapsed"));
-setRail(localStorage.getItem("tyc_rail") === "1");
+setRail(SS.get("tyc_rail") === "1");
 $("btnEdit").onclick = () => setEditing(!editing);
 $("btnSave").onclick = () => saveNow(true);
 $("cues").addEventListener("input", onEditInput);
@@ -1157,7 +1201,7 @@ $("btnReselect").onclick = () => {
 $("btnGen").onclick = () => {
   const text = $("paste").value.trim();
   if (!text){
-    const saved = localStorage.getItem("tyc_lines");
+    const saved = SS.get("tyc_lines");
     if (saved){ try { const l = JSON.parse(saved); if (Array.isArray(l) && l.length){ generate(l); return; } } catch(_){} }
     $("stat").textContent = "先拖入 docx，或把脚本文字粘到右边。";
     return;
@@ -1175,8 +1219,8 @@ $("btnBack").onclick = () => {
   $("stat").textContent = "等待导入…";
   $("brand").innerHTML = "<b>提词屏</b>";
   document.title = "直播提词 · 工作台";
-  localStorage.removeItem("tyc_title");
-  localStorage.removeItem("tyc_lines");
+  SS.del("tyc_title");
+  SS.del("tyc_lines");
   pending = null;
   if (document.fullscreenElement) document.exitFullscreen();
 };
@@ -1231,7 +1275,7 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
 /* 启动 */
 (function init(){
 
-  const saved = localStorage.getItem("tyc_lines");
+  const saved = SS.get("tyc_lines");
   if (saved){
     try {
       const l = JSON.parse(saved);
