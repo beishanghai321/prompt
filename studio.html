@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>直播提词 · 工作台</title>
+<style>
+  :root{
+    --bg:#f5f5f7;
+    --surface:#ffffff;
+    --paper:#f7f7f9;
+    --surface-2:#f5f5f7;
+    --line:#e0e0e0;
+    --line-strong:#d2d2d7;
+    --ink:#1d1d1f;
+    --ink-2:#6e6e73;
+    --ink-3:#86868b;
+    --blue:#0066cc;
+    --blue-hover:#0071e3;
+    --blue-soft:#f0f6ff;
+    --green-soft:#f0f9f4;
+    --green-line:#d5ebdf;
+    --green-ink:#0e6b46;
+    --red:#d70015;
+    --amber-ink:#a8630a;
+    --shadow:0 1px 2px rgba(0,0,0,.03), 0 10px 30px rgba(0,0,0,.035);
+    --radius:18px;
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);color:var(--ink);font-family:var(--font);
+    overflow:hidden;-webkit-font-smoothing:antialiased;letter-spacing:.005em;
+  }
+
+  /* ================= 导入视图 ================= */
+  #setup{height:100vh;display:flex;flex-direction:column;justify-content:center;padding:3vh 6vw;overflow:auto}
+  #setup .inner{width:100%;max-width:1180px;margin:0 auto}
+  #setup .top{margin-bottom:26px}
+  #setup .top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+  .homebtn{
+    display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
+    font-size:13px;color:var(--ink-2);text-decoration:none;background:var(--surface);
+    border:1px solid var(--line);border-radius:980px;padding:8px 16px;
+    transition:color .16s,border-color .16s,transform .16s,box-shadow .2s;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+  }
+  .homebtn:hover{color:var(--blue);border-color:#cfd6e2;transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.05)}
+  .homebtn svg{opacity:.8}
+  .homebtn:hover svg{opacity:1}
+  #setup h1{font-size:clamp(26px,3.6vh,40px);font-weight:600;letter-spacing:-.02em;line-height:1.15}
+  #setup h1 span{color:var(--ink-3)}
+  #setup .sub{color:var(--ink-2);font-size:clamp(13px,1.7vh,17px);line-height:1.6;margin-top:8px;font-weight:400}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 22px 20px;display:flex;flex-direction:column;min-height:0;box-shadow:var(--shadow);
+  }
+  .card h2{
+    font-size:clamp(13px,1.7vh,16px);color:var(--ink);font-weight:600;margin-bottom:14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .card h2 em{font-style:normal;color:var(--ink-3);font-weight:400;font-size:.86em}
+  .card h2 .sp{margin-left:auto}
+
+  #drop{
+    border:1.5px dashed var(--line-strong);border-radius:14px;flex:1;min-height:20vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    color:var(--ink-2);font-size:clamp(12px,1.55vh,15px);text-align:center;cursor:pointer;
+    transition:.18s;padding:26px;background:var(--surface-2);
+  }
+  #drop:hover,#drop.over{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+  #drop b{font-size:clamp(15px,2.1vh,20px);color:var(--ink);font-weight:600}
+  #drop:hover b,#drop.over b{color:var(--blue)}
+  #drop small{color:var(--ink-3)}
+
+  textarea{
+    flex:1;min-height:20vh;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);
+    border-radius:14px;padding:14px 16px;font-size:clamp(12px,1.55vh,15px);line-height:1.65;
+    font-family:var(--font);resize:none;outline:none;transition:.18s;
+  }
+  textarea::placeholder{color:#b0b0b5}
+  textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(0,113,227,.12)}
+
+  .opts{display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-top:18px;font-size:clamp(11px,1.45vh,14px);color:var(--ink-2)}
+  .opts label{display:flex;align-items:center;gap:8px}
+  .opts input[type=text],.opts input[type=number]{
+    background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);
+    border-radius:10px;padding:8px 12px;font-family:var(--font);font-size:1em;outline:none;transition:.18s;
+  }
+  .opts input[type=text]{width:15em}
+  .opts input[type=number]{width:4.6em}
+  .opts input:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(0,113,227,.12)}
+  .opts input[type=checkbox]{accent-color:var(--blue);width:15px;height:15px}
+
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:22px}
+  button.primary{
+    font-family:var(--font);font-size:clamp(13px,1.75vh,17px);font-weight:500;color:#fff;
+    background:var(--blue);border:0;border-radius:980px;padding:11px 30px;cursor:pointer;
+    letter-spacing:.01em;transition:.18s;
+  }
+  button.primary:hover{background:var(--blue-hover);transform:translateY(-.5px)}
+  button.primary:active{transform:none}
+  button.ghost{
+    font-family:var(--font);font-size:clamp(12px,1.55vh,15px);color:var(--blue);background:transparent;
+    border:1px solid var(--line-strong);border-radius:980px;padding:10px 22px;cursor:pointer;transition:.18s;
+  }
+  button.ghost:hover{background:var(--surface);border-color:#bfbfc4}
+
+  .stat{margin-left:auto;color:var(--ink-3);font-size:clamp(11px,1.45vh,14px);line-height:1.5;text-align:right}
+  .stat b{color:var(--ink);font-weight:600}
+
+  .tips{margin-top:22px;color:var(--ink-3);font-size:clamp(11px,1.4vh,13px);line-height:1.9}
+  .tips code{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--ink-2);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.94em}
+
+  /* 导入卡三态：drop / 解析中 / 解析完成 */
+  .card.import{position:relative}
+  .card.import .pbox,.card.import .dbox{display:none}
+  .card.import.busy #drop,.card.import.ready #drop{display:none}
+  .card.import.busy .pbox{display:flex}
+  .card.import.ready .dbox{display:flex}
+
+  .pbox,.dbox{
+    flex:1;min-height:20vh;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    border:1.5px solid var(--line);border-radius:14px;background:var(--surface-2);padding:26px;
+  }
+  .dbox{flex-direction:column;gap:16px}
+  .spin{
+    width:26px;height:26px;border-radius:50%;
+    border:2.5px solid #e2e2e7;border-top-color:var(--blue);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ptxt{text-align:center;line-height:1.5}
+  .ptxt b{display:block;color:var(--ink);font-size:clamp(13px,1.7vh,16px);font-weight:600;max-width:34em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ptxt span{color:var(--ink-3);font-size:clamp(11px,1.4vh,13px)}
+  .pbar{width:min(260px,70%);height:3px;background:#e6e6eb;border-radius:99px;overflow:hidden}
+  .pbar i{display:block;height:100%;width:0;background:var(--blue);border-radius:99px;transition:width .45s cubic-bezier(.4,0,.2,1)}
+  .dok{
+    width:36px;height:36px;border-radius:50%;background:#e8f6ee;color:#0e6b46;
+    display:flex;align-items:center;justify-content:center;animation:pop .34s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+  .dact{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+  /* 视图切换过渡 */
+  #setup{transition:opacity .24s ease,transform .24s ease}
+  #setup.leaving{opacity:0;transform:translateY(-10px);pointer-events:none}
+  #prompter{opacity:0;transform:translateY(14px);transition:opacity .3s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1)}
+  #prompter.on{display:flex}
+  #prompter.shown{opacity:1;transform:none}
+  /* 历史 */
+  .card.hist{margin-top:20px}
+  #hist{display:flex;flex-direction:column}
+  .hitem{
+    display:flex;align-items:center;gap:14px;padding:13px 4px;cursor:pointer;
+    border-top:1px solid var(--line);font-size:clamp(11px,1.45vh,14px);transition:.16s;
+  }
+  .hitem:first-child{border-top:0}
+  .hitem:hover{background:var(--surface-2);border-radius:10px;padding-left:10px;padding-right:10px}
+  .hitem .hdate{color:var(--ink-3);min-width:6.4em;font-variant-numeric:tabular-nums}
+  .hitem .htitle{color:var(--ink);font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hitem .hmeta{color:var(--ink-3);white-space:nowrap}
+  .hitem .del{
+    color:#c7c7cc;background:none;border:0;cursor:pointer;font-size:1.25em;line-height:1;
+    padding:0 6px;font-family:var(--font);transition:.16s;
+  }
+  .hitem .del:hover{color:var(--red)}
+  .empty{color:var(--ink-3);padding:14px 2px;font-size:clamp(11px,1.45vh,14px)}
+  .mini{font-size:clamp(10px,1.3vh,13px);padding:6px 14px}
+
+  /* ================= 提词视图 ================= */
+  #prompter{height:100vh;display:none;background:var(--paper)}
+  #prompter.on{display:flex}
+
+  .rail{
+    width:190px;min-width:170px;background:#f0f0f3;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;padding:18px 0 12px;
+  }
+  .rlogo{display:block;text-decoration:none;line-height:0}
+  /* ---------- 侧边栏：折叠 + 过渡 ---------- */
+  .rail{transition:width .34s cubic-bezier(.4,0,.2,1);overflow:hidden}
+  .rail-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 10px}
+  .rail-toggle{
+    flex:0 0 auto;width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    background:var(--surface);border:1px solid var(--line);color:var(--ink-2);cursor:pointer;
+    transition:color .16s,border-color .16s,background .16s,transform .16s;
+  }
+  .rail-toggle:hover{color:var(--blue);border-color:#c7d9f0;background:#fff}
+  .rail-toggle:active{transform:scale(.94)}
+  .rail-toggle svg{transition:transform .34s cubic-bezier(.4,0,.2,1)}
+  .rail.collapsed{width:62px}
+  .rail.collapsed .rail-toggle svg{transform:rotate(180deg)}
+  .rail.collapsed .brand,
+  .rail.collapsed .legend,
+  .rail.collapsed .navbtn .nm,
+  .rail.collapsed .navbtn .tm{opacity:0;pointer-events:none}
+  .rail .brand,
+  .rail .navbtn .nm,
+  .rail .navbtn .tm,
+  .rail .legend{transition:opacity .2s ease}
+  .rail .brand{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rail.collapsed .navbtn{justify-content:center;padding-left:0;padding-right:0}
+  .rail.collapsed .navbtn .no{min-width:0}
+  .rail.collapsed .navbtn.on{background:transparent;border-color:transparent;box-shadow:none}
+  .rail.collapsed .navbtn.on .no{color:var(--blue)}
+  .rlogo img{width:22px;height:22px;display:block;opacity:.92}
+  .rlogo:hover img{opacity:1}
+  .rail .brand{padding:0 16px 14px;font-size:11.5px;color:var(--ink-3);line-height:1.45;letter-spacing:.01em}
+  .rail .brand b{
+    color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;font-size:13.5px;font-weight:600;letter-spacing:-.01em;line-height:1.35;
+  }
+  .navbtn{
+    display:flex;gap:8px;align-items:baseline;padding:9px 12px;margin:2px 8px;border-radius:10px;
+    cursor:pointer;border:1px solid transparent;background:transparent;color:var(--ink-2);
+    text-align:left;width:calc(100% - 16px);font-family:var(--font);transition:.16s;
+  }
+  .navbtn:hover{background:rgba(0,0,0,.035);color:var(--ink)}
+  .navbtn .no{font-size:14px;font-weight:600;color:#b0b0b5;min-width:1.2em}
+  .navbtn .nm{font-size:13px;font-weight:500;line-height:1.3;color:inherit}
+  .navbtn .tm{font-size:10.5px;color:var(--ink-3);display:block;margin-top:2px;font-variant-numeric:tabular-nums}
+  .navbtn.on{background:var(--surface);border-color:var(--line);box-shadow:0 1px 2px rgba(0,0,0,.05);color:var(--ink)}
+  .navbtn.on .no{color:var(--blue)}
+
+  .legend{margin-top:auto;padding:12px 16px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+  .legend .lg{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2)}
+  .legend .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .legend .hint{color:#b0b0b5;font-size:10.5px;line-height:1.8;margin-top:4px}
+  .legend .back{margin-top:10px}
+  .legend .back button{
+    width:100%;font-family:var(--font);font-size:12.5px;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line-strong);border-radius:980px;padding:8px 10px;cursor:pointer;transition:.16s;
+  }
+  .legend .back button:hover{border-color:#bfbfc4;background:#fff}
+
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;padding:22px 34px 0}
+  .head{
+    display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;width:100%;max-width:1400px;margin:0 auto;
+    padding-bottom:14px;border-bottom:1px solid var(--line);flex:0 0 auto;
+  }
+  .head .ttl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .head .num{font-size:clamp(24px,3.4vh,40px);font-weight:600;color:var(--blue);letter-spacing:-.02em;line-height:1}
+  .head h1{font-size:clamp(20px,2.9vh,32px);font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+  .head .win{
+    font-size:clamp(11px,1.4vh,14px);color:var(--blue);font-weight:500;
+    background:var(--blue-soft);border-radius:980px;padding:5px 12px;white-space:nowrap;
+  }
+  .clock{margin-left:auto;text-align:right;min-width:120px}
+  .clock .t{
+    font-variant-numeric:tabular-nums;font-size:clamp(22px,3.4vh,40px);font-weight:600;letter-spacing:-.01em;
+    font-feature-settings:"tnum";color:var(--ink);line-height:1;
+  }
+  .clock .t.warn{color:var(--amber-ink)}
+  .clock .t.over{color:var(--red)}
+  .clock .bar{height:3px;background:#ececf0;border-radius:99px;margin-top:8px;overflow:hidden}
+  .clock .bar i{display:block;height:100%;width:100%;background:var(--blue);transition:width .3s linear}
+  .clock .hint{font-size:10.5px;color:var(--ink-3);margin-top:6px;letter-spacing:.02em}
+
+  .fsbar{
+    display:flex;align-items:center;gap:2px;margin-left:10px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:980px;padding:3px 4px;font-size:12px;color:var(--ink-3);
+  }
+  .fsbar button{
+    font-family:var(--font);font-size:12px;font-weight:500;color:var(--ink-2);background:transparent;
+    border:0;border-radius:980px;width:30px;height:26px;line-height:1;cursor:pointer;transition:.16s;
+  }
+  .fsbar button:hover{background:#fff;color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .fsbar .now{min-width:58px;text-align:center;color:var(--ink-3);font-variant-numeric:tabular-nums;font-size:11px}
+
+  .cues{
+    list-style:none;flex:1;min-height:0;width:100%;max-width:1400px;margin:0 auto;
+    overflow-y:auto;overflow-x:hidden;font-size:var(--fs,2.1vh);padding:18px 2px 60vh 0;
+    scrollbar-width:thin;scrollbar-color:#c7c7cc transparent;
+  }
+  .cues::-webkit-scrollbar{width:10px}
+  .cues::-webkit-scrollbar-track{background:transparent}
+  .cues::-webkit-scrollbar-thumb{background:#dcdce1;border-radius:99px}
+  .cues::-webkit-scrollbar-thumb:hover{background:#c7c7cc}
+
+  .cues li{display:block;padding:4px 12px 6px 8px;border-radius:10px;font-size:1em;color:var(--ink)}
+  .cues li.start{padding-top:14px;border-top:1px solid #eeeef2;margin-top:2px}
+  .cues li.start:first-child{border-top:0;padding-top:0}
+  .cues li .line{display:flex;gap:12px;align-items:flex-start;line-height:1.5}
+  .cues li .line + .line{margin-top:2px}
+
+  .sp{
+    flex:0 0 auto;font-weight:500;border-radius:7px;padding:2px 8px;margin-top:3px;
+    font-size:.66em;white-space:nowrap;min-width:4.6em;text-align:center;letter-spacing:.01em;
+    background:var(--surface-2);color:var(--ink-2);
+  }
+  .sp.zeng{color:#0066cc;background:#eaf3fd}
+  .sp.sun{color:#a8630a;background:#fdf3e6}
+  .sp.s3{color:#6b3fd4;background:#f2edfe}
+  .sp.s4{color:#0e6b46;background:#e9f7ef}
+  .sp.go{color:#0e6b46;background:#e3f5ec}
+  .sp.ctl{color:#3d5a80;background:#eef3f9}
+  .sp.cont{background:none;color:#c7c7cc}
+
+  .say{flex:1;min-width:0}
+  .say b{color:var(--ink);font-weight:600}
+  .say em{font-style:normal;color:var(--blue);font-weight:500}
+
+  .cues li.special{background:#f4faf6;border:1px solid #e0efe6;border-radius:12px;margin-top:14px;padding:10px 12px}
+  .cues li.special .say{color:var(--green-ink)}
+
+  body.leaving{opacity:0;transition:opacity .22s ease}
+  #setup .inner{animation:fadeUp .42s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes fadeUp{from{transform:translateY(10px)}to{transform:none}}
+
+  .editbar{display:flex;align-items:center;gap:6px;margin-left:10px}
+  .editbar button{
+    font-family:var(--font);font-size:12px;font-weight:500;color:var(--ink-2);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:980px;
+    padding:5px 13px;cursor:pointer;transition:.16s;
+  }
+  .editbar button:hover{color:var(--blue);border-color:#c7d9f0;background:#fff}
+  .editbar button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  .editbar button.on:hover{background:var(--blue-hover);color:#fff}
+  .savehint{font-size:11px;color:var(--ink-3);min-width:6.5em;transition:color .2s}
+
+  /* 编辑态：每句一个可直接改的文本块 */
+  .cues .editor{
+    flex:1;min-width:0;outline:none;border-radius:6px;padding:1px 3px;
+    font-size:1em;line-height:1.5;color:var(--ink);white-space:pre-wrap;word-break:break-word;
+    transition:background .16s,box-shadow .16s;cursor:text;
+  }
+  .cues .editor:hover{background:rgba(0,113,227,.045)}
+  .cues .editor:focus{background:#fff;box-shadow:0 0 0 1px var(--blue),0 0 0 4px rgba(0,113,227,.10)}
+  .cues li.editing{padding-top:10px}
+  /* 句子悬停高亮：轻底色 + 左侧细条，不改变排版 */
+  @media (hover:hover){
+    .cues li{position:relative;border-radius:8px;transition:background-color .16s ease}
+    .cues li::before{
+      content:"";position:absolute;left:1px;top:.2em;bottom:.2em;width:2px;border-radius:2px;
+      background:var(--blue);opacity:0;transform:scaleY(.6);transform-origin:center;
+      transition:opacity .16s ease,transform .16s ease;
+    }
+    .cues li:hover{background:rgba(0,113,227,.06)}
+    .cues li:hover::before{opacity:.55;transform:scaleY(1)}
+    .cues li.special:hover{background:#eef7f1;border-color:#cbe6d8}
+    .cues li:hover .say{color:#0b0b0c}
+  }
+  .flash{position:fixed;inset:0;pointer-events:none;display:none;box-shadow:inset 0 0 0 3px rgba(215,0,21,.35)}
+  .flash.on{display:block;animation:soft 1.6s ease-in-out infinite}
+  @keyframes soft{50%{opacity:.35}}
+</style>
+</head>
+<body>
+
+<!-- ================= 导入 ================= -->
+<section id="setup">
+ <div class="inner">
+  <div class="top">
+    <div class="titles">
+      <h1>直播提词 <span>工作台</span></h1>
+      <div class="sub">拖入 docx 脚本，或粘贴文字，生成后直接开播。</div>
+    </div>
+    <a class="homebtn" href="index.html" title="返回首页">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M19 12H6M11.5 5.5L5 12l6.5 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      首页
+    </a>
+  </div>
+
+  <div class="grid">
+    <div class="card import" id="importCard">
+      <h2>导入脚本 <em>支持 .docx</em></h2>
+
+      <div id="drop">
+        <b>把 docx 拖到这里</b>
+        <span>或点击选择文件</span>
+        <small>全部在本机处理，不上传</small>
+      </div>
+
+      <div id="parseBox" class="pbox">
+        <div class="spin"></div>
+        <div class="ptxt">
+          <b id="pName">文件</b>
+          <span id="pState">正在读取文件…</span>
+        </div>
+        <div class="pbar"><i id="pFill"></i></div>
+      </div>
+
+      <div id="doneBox" class="dbox">
+        <div class="dok">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="ptxt">
+          <b id="dName">文件</b>
+          <span id="dMeta"></span>
+        </div>
+        <div class="dact">
+          <button class="primary" id="btnEnter">进入提词</button>
+          <button class="ghost" id="btnReselect">重新选择</button>
+        </div>
+      </div>
+
+      <input type="file" id="file" accept=".docx" style="display:none" />
+    </div>
+
+    <div class="card">
+      <h2>粘贴文字 <em>从 Word 直接复制</em></h2>
+      <textarea id="paste" placeholder="环节1：暖场留人（0—4分钟）
+【曾老师】大家好，欢迎来到直播间……
+【孙总】我是厂家品牌运营总监……
+中控配合：发红包；置顶活动信息"></textarea>
+    </div>
+  </div>
+
+  <div class="opts">
+    <label>标题 <input type="text" id="optTitle" placeholder="可留空" /></label>
+    <label>每行最多字数 <input type="number" id="optLen" value="52" min="20" max="120" step="2" /></label>
+    <label><input type="checkbox" id="optBold" checked /> 数字与关键承诺加粗</label>
+  </div>
+
+  <div class="bar">
+    <button class="primary" id="btnGen">生成提词</button>
+    <button class="ghost" id="btnDemo">载入示例</button>
+    <div class="stat" id="stat">等待导入…</div>
+  </div>
+
+  <div class="card hist">
+    <h2>历史脚本 <em>每次生成自动存一条</em><button class="ghost mini sp" id="btnClearHist">清空</button></h2>
+    <div id="hist"></div>
+  </div>
+
+  <div class="tips">
+    板块标题写成 <code>环节1：暖场留人（0—4分钟）</code>；每句用 <code>【说话人】</code> 开头；一行一段；
+    <code>中控配合：</code> 会收进该板块；遇到 <code>四、</code> 之类大标题自动停止。
+  </div>
+ </div>
+</section>
+
+<!-- ================= 提词 ================= -->
+<section id="prompter">
+  <nav class="rail" id="rail">
+    <div class="rail-top">
+      <a class="rlogo" href="index.html" title="回到首页"><img src="assets/logo-mark.svg" alt="Arvea" /></a>
+      <button class="rail-toggle" id="railToggle" title="收起 / 展开（[）" aria-expanded="true">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+          <path d="M14.5 5.5L8 12l6.5 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="brand" id="brand"><b>提词屏</b></div>
+    <div id="nav"></div>
+    <div class="legend">
+      <div id="legendSpeakers" style="display:flex;flex-direction:column;gap:7px"></div>
+      <div class="hint">滚轮 / ↑↓ 上下滑<br>← → 切板块 ｜ 1—9 直跳<br>空格 计时 ｜ R 归零 ｜ F 全屏<br>- = 调字号 ｜ [ 收起侧栏</div>
+      <div class="back"><button id="btnBack">首页</button></div>
+    </div>
+  </nav>
+
+  <main class="stage">
+    <header class="head">
+      <div class="ttl">
+        <div class="num" id="hNum">①</div>
+        <h1 id="hName">—</h1>
+        <div class="win" id="hWin">—</div>
+      </div>
+      <div class="clock">
+        <div class="t" id="clockT">00:00</div>
+        <div class="bar"><i id="clockBar"></i></div>
+        <div class="hint" id="clockHint">剩余时间 · 空格开始</div>
+      </div>
+      <div class="fsbar">
+        <button id="fsDown" title="缩小字号（-）">A−</button>
+        <span class="now" id="fsNow">字号</span>
+        <button id="fsUp" title="放大字号（=）">A+</button>
+      </div>
+      <div class="editbar">
+        <button id="btnEdit" title="修改台词">编辑</button>
+        <button id="btnSave" title="保存到本机">保存</button>
+        <span class="savehint" id="saveHint"></span>
+      </div>
+    </header>
+    <ol class="cues" id="cues"></ol>
+  </main>
+</section>
+
+<div class="flash" id="flash"></div>
+
+<script>
+/* ================= 0. 入口统一到首页 ================= */
+(function(){
+  const fromHome = /[?&]from=home/.test(location.search) || sessionStorage.getItem("tyc_from_home") === "1";
+  if (fromHome){
+    sessionStorage.setItem("tyc_from_home", "1");   // 本次会话内刷新不再弹回首页
+  } else {
+    location.replace("index.html");                 // 直接打开工作台 → 先回首页
+  }
+})();
+
+/* ================= 1. docx 解析 ================= */
+async function unzipEntry(buffer, wanted){
+  const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
+  let eocd = -1;
+  for (let i = dv.byteLength - 22; i >= Math.max(0, dv.byteLength - 66000); i--){
+    if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("不是有效的 docx");
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  for (let n = 0; n < count; n++){
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method  = dv.getUint16(off + 10, true);
+    const compSz  = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true);
+    const extraLen= dv.getUint16(off + 30, true);
+    const cmtLen  = dv.getUint16(off + 32, true);
+    const localOff= dv.getUint32(off + 42, true);
+    const name = new TextDecoder("utf-8").decode(u8.subarray(off + 46, off + 46 + nameLen));
+    if (name === wanted){
+      const lNameLen  = dv.getUint16(localOff + 26, true);
+      const lExtraLen = dv.getUint16(localOff + 28, true);
+      const start = localOff + 30 + lNameLen + lExtraLen;
+      const data  = u8.subarray(start, start + compSz);
+      if (method === 0) return new TextDecoder("utf-8").decode(data);
+      const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return await new Response(stream).text();
+    }
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  throw new Error("docx 里没有 document.xml");
+}
+
+async function docxToLines(file){
+  const xml = await unzipEntry(await file.arrayBuffer(), "word/document.xml");
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const body = doc.getElementsByTagNameNS(W, "body")[0];
+  const lines = [];
+  for (const node of body.children){
+    if (node.localName !== "p") continue;
+    let s = "";
+    for (const t of node.getElementsByTagNameNS(W, "t")) s += t.textContent;
+    s = s.trim();
+    if (s) lines.push(s);
+  }
+  return lines;
+}
+function textToLines(text){ return text.split(/\r?\n/).map(s => s.trim()).filter(Boolean); }
+/* 从正文里取「大标题」：第一行像标题的短句，去掉脚本/修订版之类后缀 */
+function extractTitle(lines){
+  const bad = /^(环节\s*\d|[一二三四五六七八九十]、|【|中控配合|环节内容|话术参考|KT板|对应KT板)/;
+  for (const raw of lines.slice(0, 6)){
+    let t = String(raw).replace(/[【】\[\]]/g,"").trim();
+    if (!t || t.length > 40) continue;
+    if (bad.test(t)) continue;
+    if (t.replace(/\s/g,"").length < 3) continue;
+    t = t.replace(/[\s　]*[（(][^）)]*[）)]\s*$/,"")            // 去掉结尾括号说明
+         .replace(/(直播)?话术脚本.*$/,"")                       // 去掉「话术脚本（修定版）」之类
+         .replace(/(直播)?脚本.*$/,"")
+         .replace(/[\-—_·]+$/,"")
+         .trim();
+    if (t.length >= 3) return t;
+  }
+  return "";
+}
+
+/* ================= 2. 切板块 / 切句子 ================= */
+/* ---------- 兼容多种写法的解析 ----------
+   板块标题认三种：
+     环节1：暖场留人（0—4分钟）
+     00:00‑08:00 曹医生开场｜问候回归…
+     一、开场 / 第一段 这类短标题（没有时间就按条数估时长）
+   说话人认：
+     【曾老师】xxx   或    曹医生：xxx
+   其它行按「上一句说话人的续句」处理。
+*/
+const RE_BLOCK_ENV   = /^\s*环节\s*(\d+)\s*(附加)?\s*[：:]?\s*(.+?)\s*[（(]\s*(\d+)\s*[—\-–~至‑]+\s*(\d+)\s*分钟\s*[）)]/;
+const RE_BLOCK_CLOCK = /^\s*(\d{1,2})\s*[:：]\s*(\d{2})\s*[—\-–~至‑]+\s*(\d{1,2})\s*[:：]\s*(\d{2})\s*[｜|]?\s*(.*)$/;
+const RE_SPEAKER_BR  = /^\s*[【\[]\s*([^】\]]{1,14})\s*[】\]]\s*(.*)$/;
+const RE_SPEAKER_COL = /^\s*([^\s：:（）()\[\]【】，。！？、]{1,10})\s*(?:[（(][^）)]{0,12}[）)])?\s*[：:]\s*(.+)$/;
+const RE_STOP        = /^\s*(四|五|六|七)、/;
+const SKIP_PFX       = ["环节内容","话术参考","对应KT板","KT板","物料清单","直播基本信息","二、","三、","备注：","说明：","目录"];
+const RE_NOISE       = /^(KT\s*\d|KT板|对应KT板|环节内容|话术参考|物料清单|直播基本信息|备注|说明|目录|附：|附录)/;
+const CIRCLED        = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
+
+/* 这些「XX：」不算说话人 */
+const NOT_NAME = new Set(["时间","日期","地点","主题","受众","风格","场景","周期","备注","提示","注意","流程","目标","目的","物料","准备","话术","环节","主持","嘉宾","主播","主讲","时长","价格","产品","机制","福利","抽奖","规则","说明","标题","内容","阶段","板块","步骤","重点","案例","来源","参考","画面","字幕","音效","道具","镜头","背景","平台","栏目","账号","版本","日期时间"]);
+
+function secOf(h, m){ return (+h) * 60 + (+m); }                 // 08:00 → 480 秒
+function mmss(sec){ const m = Math.floor(sec/60), r = sec%60; return String(m).padStart(2,"0") + ":" + String(r).padStart(2,"0"); }
+
+const ROLE_TAIL = /(医生|老师|医师|教授|主任|经理|总监|主持|嘉宾|主播|助手|顾问|营养师|管理师|店长|客服|导播|先生|女士|哥哥|姐姐|师傅|老师傅)$/;
+const NAME_BAD  = /[的是这那就都也还而且并所但因如若我们大家您你们他们，。！？、；]/;
+
+let COLON_NAMES = new Map();
+function collectColonNames(lines){
+  COLON_NAMES = new Map();
+  for (const line of lines){
+    const m = line.match(RE_SPEAKER_COL);
+    if (!m) continue;
+    const n = m[1].trim();
+    if (n.length >= 2 && n.length <= 6 && !NAME_BAD.test(n) && !/^\d+$/.test(n)) {
+      COLON_NAMES.set(n, (COLON_NAMES.get(n) || 0) + 1);
+    }
+  }
+}
+function isPersonName(n){
+  if (n.length < 2 || n.length > 6) return false;
+  if (NOT_NAME.has(n) || /^\d+$/.test(n) || NAME_BAD.test(n)) return false;
+  if (ROLE_TAIL.test(n)) return true;
+  return (COLON_NAMES.get(n) || 0) >= 2;          // 没有角色后缀，但反复出现，认它是人名
+}
+
+function detectSpeaker(line){
+  let m = line.match(RE_SPEAKER_BR);
+  if (m) return { sp: m[1].trim(), t: m[2].trim() };
+
+  m = line.match(RE_SPEAKER_COL);
+  if (m){
+    const name = m[1].trim();
+    if (isPersonName(name)) return { sp: name, t: m[2].trim() };
+  }
+  return null;
+}
+
+function parseScript(lines){
+  const clean = lines.map(l => String(l).trim()).filter(Boolean);
+  collectColonNames(clean);
+
+  // 先看有没有任何板块标题；没有就走「整场一段」
+  const hasEnv   = clean.some(l => RE_BLOCK_ENV.test(l));
+  const hasClock = clean.some(l => RE_BLOCK_CLOCK.test(l));
+  const single   = !hasEnv && !hasClock;
+
+  const blocks = [];
+  let cur = null;
+
+  const startBlock = (name, win, dur) => {
+    cur = { idx: blocks.length + 1, name: name || `第${blocks.length+1}段`, win, dur: Math.max(60, Math.round(dur)), cues: [], ctrl: "", lastSp: "" };
+    blocks.push(cur);
+  };
+
+  for (const line of clean){
+    if (RE_STOP.test(line)) break;
+
+    if (!single){
+      // ① 环节N：xxx（a—b分钟）
+      let m = line.match(RE_BLOCK_ENV);
+      if (m){
+        const extra = !!m[2];
+        if (extra && blocks.length && blocks[blocks.length-1].idx === +m[1]){ cur = blocks[blocks.length-1]; continue; }
+        const from = +m[4], to = +m[5];
+        startBlock(m[3].trim(), `${from}—${to} 分钟`, (to - from) * 60);
+        continue;
+      }
+      // ② 00:00-08:00 标题
+      m = line.match(RE_BLOCK_CLOCK);
+      if (m){
+        const s = secOf(m[1], m[2]), e = secOf(m[3], m[4]);
+        let name = (m[5] || "").trim().split(/[｜|，,]/)[0].trim();
+        if (!name) name = `第${blocks.length+1}段`;
+        startBlock(name, `${mmss(s)}—${mmss(e)}`, Math.max(60, e - s));
+        continue;
+      }
+    } else if (!cur){
+      // 没有任何标题：整篇做成一块，时长按句数估
+      startBlock("整场", "全场", Math.min(3600, Math.max(300, clean.length * 18)));
+    }
+
+    if (!cur) continue;                       // 第一个标题之前的内容跳过
+
+    if (/^\s*中控配合\s*[：:]/.test(line)){ cur.ctrl = line.replace(/^\s*中控配合\s*[：:]\s*/, "").trim(); continue; }
+    if (RE_NOISE.test(line) || SKIP_PFX.some(pfx => line.startsWith(pfx))) continue;
+
+    const sp = detectSpeaker(line);
+    if (sp){
+      if (!sp.t) continue;
+      cur.lastSp = sp.sp;
+      cur.cues.push({ sp: sp.sp, t: sp.t });
+      continue;
+    }
+    // 续句
+    cur.cues.push({ sp: cur.lastSp, t: line });
+  }
+
+  const out = blocks.filter(b => b.cues.length);
+  const classes = ["sp zeng","sp sun","sp s3","sp s4"];
+  const speakers = [];
+  out.forEach(b => b.cues.forEach(c => {
+    if (!c.sp) return;
+    if (!speakers.find(x => x.key === c.sp)) speakers.push({ key: c.sp, label: c.sp, cls: classes[Math.min(speakers.length, classes.length-1)] });
+  }));
+
+  const data = out.map((b, i) => {
+    const nb = out[i+1];
+    let next;
+    if (nb){
+      let first = nb.cues[0].t;
+      if (first.length > 46) first = first.slice(0,46) + "…";
+      next = `本块最后一句说完，就接下一块：${first}（${nb.win} 开始【${nb.name}】）`;
+    } else {
+      next = "时间到归零，回到 ① 重新开始下一轮。";
+    }
+    return {
+      no: CIRCLED[i] || `(${i+1})`, name: b.name, win: b.win, dur: b.dur,
+      cues: b.cues.map(c => [c.sp || "", c.t]), next, ctrl: b.ctrl
+    };
+  });
+  return { blocks:data, speakers };
+}
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function emphasize(s){
+  let out = esc(s);
+  out = out.replace(/(\d+(?:\.\d+)?\s*(?:块|元|瓶|片|克|天|个月|%|折|亿|个名额|个)?)/g, "<b>$1</b>");
+  out = out.replace(/(买\s*27\s*送\s*27|再送\s*1\s*瓶|只限今天|下播就收回|不能断断续续|千万别拖|药不能停|保价全年)/g, "<em>$1</em>");
+  return out;
+}
+
+/* ================= 3. 提词器 ================= */
+let BLOCKS = [], SP = {}, bi = 0, left = 0, timer = null, running = false;
+let MAXLEN = 52, boldOn = true;
+
+const $ = id => document.getElementById(id);
+const fmt = s => { s = Math.max(0, Math.round(s)); return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0"); };
+
+function segment(t){
+  const out = [], sents = t.match(/[^。！？；]+[。！？；]?/g) || [t];
+  let cur = "";
+  for (const s of sents){
+    if ((cur + s).length <= MAXLEN){ cur += s; continue; }
+    if (cur){ out.push(cur); cur = ""; }
+    if (s.length <= MAXLEN){ cur = s; continue; }
+    const parts = s.match(/[^，、：]+[，、：]?/g) || [s];
+    for (const p of parts){
+      if ((cur + p).length <= MAXLEN) cur += p;
+      else { if (cur) out.push(cur); cur = p; }
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+function renderNav(){
+  $("nav").innerHTML = BLOCKS.map((b,idx)=>
+    `<button class="navbtn${idx===bi?" on":""}" data-i="${idx}">
+       <span class="no">${b.no}</span>
+       <span><span class="nm">${b.name}</span><span class="tm">${b.win}</span></span>
+     </button>`).join("");
+  $("nav").querySelectorAll(".navbtn").forEach(el => el.onclick = () => go(+el.dataset.i));
+  $("legendSpeakers").innerHTML = (SP.__order || []).map(k =>
+    `<div class="lg"><span class="dot" style="background:${SP[k][2]}"></span>${SP[k][0]}</div>`).join("");
+}
+
+let editing = false, currentKey = null, saveTimer = null;
+
+function render(){
+  const b = BLOCKS[bi];
+  $("hNum").textContent = b.no;
+  $("hName").textContent = b.name;
+  $("hWin").textContent = b.win;
+
+  if (editing) renderEdit(); else renderRead();
+
+  $("cues").scrollTop = editing ? $("cues").scrollTop : 0;
+  renderNav();
+  applyFs();
+  paintClock();
+}
+
+function renderRead(){
+  const b = BLOCKS[bi];
+  const cards = [];
+  b.cues.forEach(([sp,t]) => {
+    const lines = segment(t).map((part,i) => ({ sp: i === 0 ? sp : null, html: boldOn ? emphasize(part) : esc(part) }));
+    cards.push({ lines, special:false });
+  });
+  cards.push({ lines:[{ sp:"go",  html: esc(b.next) }], special:true });
+  if (b.ctrl) cards.push({ lines:[{ sp:"ctl", html: esc(b.ctrl) }], special:true });
+
+  $("cues").innerHTML = cards.map(c=>{
+    const firstSp = c.lines[0].sp;
+    const hasBadge = !!(SP[firstSp] && SP[firstSp][0]);
+    const inner = c.lines.map(ln=>{
+      let badge = "";
+      if (ln.sp){
+        const pair = SP[ln.sp] || ["",""];
+        if (pair[0]) badge = `<span class="${pair[1]}">${pair[0]}</span>`;
+      } else if (hasBadge){
+        badge = `<span class="sp cont">·</span>`;
+      }
+      return `<div class="line">${badge}<span class="say">${ln.html}</span></div>`;
+    }).join("");
+    return `<li class="${c.special ? "special" : "start"}">${inner}</li>`;
+  }).join("");
+}
+
+/* 编辑态：一句一个可编辑文本块（contenteditable，天然按内容撑高） */
+function renderEdit(){
+  const b = BLOCKS[bi];
+  const rows = b.cues.map((c,i)=>{
+    const pair = SP[c[0]] || ["",""];
+    const badge = pair[0] ? `<span class="${pair[1]}">${pair[0]}</span>` : "";
+    return `<li class="start editing"><div class="line">${badge}<div class="editor" contenteditable="true" data-kind="cue" data-i="${i}">${esc(c[1])}</div></div></li>`;
+  });
+  rows.push(`<li class="special editing"><div class="line"><span class="sp go">切下一板块</span><div class="editor" contenteditable="true" data-kind="next">${esc(b.next)}</div></div></li>`);
+  if (b.ctrl) rows.push(`<li class="special editing"><div class="line"><span class="sp ctl">中控配合</span><div class="editor" contenteditable="true" data-kind="ctrl">${esc(b.ctrl)}</div></div></li>`);
+  $("cues").innerHTML = rows.join("");
+}
+
+function onEditInput(e){
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains("editor")) return;
+  const b = BLOCKS[bi];
+  const val = el.innerText.replace(/\n{2,}/g, "\n");
+  if (el.dataset.kind === "cue") b.cues[+el.dataset.i][1] = val;
+  else if (el.dataset.kind === "next") b.next = val;
+  else if (el.dataset.kind === "ctrl") b.ctrl = val;
+  scheduleSave();
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  $("saveHint").textContent = "改动待保存…";
+  $("saveHint").style.color = "#a8630a";
+  saveTimer = setTimeout(()=> saveNow(false), 700);
+}
+
+function saveNow(manual){
+  const arr = getHist();
+  const rec = arr.find(x => x.id === currentKey);
+  const snap = JSON.parse(JSON.stringify(BLOCKS));
+  if (rec){
+    rec.blocks = snap;
+    rec.cues = BLOCKS.reduce((n,b)=> n + b.cues.length, 0);
+    rec.updatedAt = Date.now();
+    setHist(arr);
+  }
+  localStorage.setItem("tyc_blocks", JSON.stringify({ key: currentKey, blocks: snap }));
+  const t = new Date();
+  const hh = String(t.getHours()).padStart(2,"0"), mm = String(t.getMinutes()).padStart(2,"0");
+  $("saveHint").textContent = (manual ? "已保存 " : "已自动保存 ") + hh + ":" + mm;
+  $("saveHint").style.color = "var(--ink-3)";
+}
+
+function setEditing(on){
+  editing = on;
+  $("btnEdit").classList.toggle("on", on);
+  $("btnEdit").textContent = on ? "完成" : "编辑";
+  render();
+}
+function paintClock(){
+  const b = BLOCKS[bi];
+  const t = $("clockT"), bar = $("clockBar");
+  t.textContent = left >= 0 ? fmt(left) : "-" + fmt(-left);
+  const pct = Math.max(0, Math.min(1, left / (b.dur || 1)));
+  bar.style.width = (pct*100).toFixed(1) + "%";
+  t.className = "t" + (left < 0 ? " over" : left <= (b.dur||0)*0.2 ? " warn" : "");
+  $("flash").className = "flash" + (left < 0 ? " on" : "");
+  $("clockHint").textContent = left < 0 ? "已超时 · 该切下一板块了"
+    : (running ? "计时中 · 到点切板块" : "剩余时间 · 空格开始");
+}
+
+function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); if (running) tickStart(); }
+function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ left -= 1; paintClock(); }, 1000); }
+function toggle(){ running = !running; if (running) tickStart(); else clearInterval(timer); paintClock(); }
+function reset(){ left = BLOCKS[bi].dur; paintClock(); }
+
+let fsVh = parseFloat(localStorage.getItem("tyc_fs") || "2.1");
+if (!(fsVh >= 1.2 && fsVh <= 4.2)) fsVh = 2.1;
+function applyFs(){
+  document.documentElement.style.setProperty("--fs", fsVh.toFixed(2) + "vh");
+  const px = parseFloat(getComputedStyle($("cues")).fontSize) || 0;
+  $("fsNow").textContent = "字号 " + Math.round(px);
+  localStorage.setItem("tyc_fs", fsVh.toFixed(2));
+}
+function bumpFs(d){ fsVh = Math.min(4.2, Math.max(1.2, +(fsVh + d).toFixed(2))); applyFs(); }
+
+/* ================= 4. 生成 ================= */
+async function generate(lines, titleOverride){
+  boldOn = $("optBold").checked;
+  MAXLEN = Math.max(20, Math.min(120, +$("optLen").value || 52));
+
+  const parsed = parseScript(lines);
+  if (!parsed.blocks.length){
+    $("stat").innerHTML = "<b style='color:#d70015'>没解析到台词</b>　检查是否有「环节1：xx（0—4分钟）」和【说话人】";
+    return;
+  }
+  BLOCKS = parsed.blocks;
+  SP = {};
+  const colorOf = { "sp zeng":"#0071e3", "sp sun":"#e08a1e", "sp s3":"#8a5cf6", "sp s4":"#1a9e63" };
+  parsed.speakers.forEach(s => { SP[s.key] = [s.label, s.cls, colorOf[s.cls] || "#8e8e93"]; });
+  SP["go"]  = ["切下一板块", "sp go"];
+  SP["ctl"] = ["中控配合", "sp ctl"];
+  SP.__order = parsed.speakers.map(s => s.key);
+
+  const title = (titleOverride !== undefined ? String(titleOverride) : $("optTitle").value).trim();
+  if (title){
+    document.title = title + " · 提词";
+    $("brand").innerHTML = `<b>${esc(title)}</b>`;
+  } else {
+    document.title = "直播提词 · 工作台";
+    $("brand").innerHTML = `<b>提词屏</b>`;
+  }
+
+  const total = BLOCKS.reduce((n,b)=> n + b.cues.length, 0);
+  $("stat").innerHTML = `已解析 <b>${BLOCKS.length}</b> 个板块 · <b>${total}</b> 句 · ${parsed.speakers.map(s=>s.label).join(" / ") || "无说话人"}`;
+
+  bi = 0; left = BLOCKS[0].dur; running = false;
+  render();
+  enterPrompter();
+  localStorage.setItem("tyc_lines", JSON.stringify(lines));
+  localStorage.setItem("tyc_title", title);
+  currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""));
+}
+
+/* ================= 5. 历史 ================= */
+const HIST_KEY = "tyc_hist_v1";
+const SEED = {title:"敖东植物甾醇银杏叶片 · 11.20 直播", date:"2026-11-18", lines:["敖东植物甾醇银杏叶片 直播话术脚本","一、直播基本信息与价格机制总览","二、30分钟循环环节总览","三、各环节详细话术与KT板","环节1：暖场留人（0—4分钟）","环节内容：曾老师先热场，报出“敖东70周年庆厂家直供”；介绍自己是国际注册营养师，“既懂产品也懂营养”；再请孙总出场，点明孙总是敖东厂家品牌运营总监、今天专程来破价；预告红包、整点半点抽奖、驼绒被和买赠，还有70岁老人专属福利钩子；用扣字互动筛出目标人群。","话术参考：","【曾老师】叔叔阿姨早上好，欢迎来到敖东植物甾醇银杏叶片的官方直播间！我是既懂产品又懂营养的曾老师，国际注册营养师，也是今天的主播。刚进来的家人先别划走，今天不是普通的直播带货，是敖东70周年庆的厂家感恩直供专场。先跟大家说一句：敖东 70 载，感恩一路有你们，感谢大家一直以来的支持、理解和厚爱！","【曾老师】来，屏幕上帮我扣个“70”，我看看有多少家人是陪着敖东一路走过来的。扣“70”的家人，今天来了，绝对不亏。","【曾老师】我先说三件事：第一，今天有红包，开场一轮，整点还有，红包不停，福利不止；第二，整点、半点有抽奖，银杏叶片、驼绒被统统都有，免费送；第三，今天我特意把咱们敖东厂家的品牌运营总监孙总请到了直播间，孙总手里握着周年专项配额，今天的福利，都要孙总来拍板。","【曾老师】 （抛出70岁专属福利钩子）在孙总出场前，我先给大家透个底，加个重磅福利！","咱们敖东今年建厂70周年，为了感恩老一辈，今年只要是70岁的叔叔阿姨，今天在直播间下单过的都可以找你们的健康顾问出示您的身份证，咱们厂家额外再多送您一瓶银杏叶片！ 家有一老如有一宝，这是咱们敖东给长辈们专属的敬礼！家里有70岁老人的，或者您自己今年过70大寿的，今天这波福利千万别错过！","【曾老师】接下来，屏幕上扣个 “1” 让我看看，今天直播间有没有之前在外边买过我们这款银杏叶片吃着吃着停下来的，或者一直在坚持吃、有真实感受的叔叔阿姨（曾老师手持银杏叶片产品展示），扣 “1” 的家人，等一下孙总讲的时候你们认真听，今天的机制就是给你们争取的；有感受的，顺手打在公屏上，跟新朋友说道说道。好了，话不多说，接下来让我隆重欢迎一下我们的孙总。","【孙总】直播间的家人们，大家好，我是敖东厂家品牌运营总监孙星，非常开心能在直播间跟大家相见，刚看到很多叔叔阿姨的留言，很感谢各位家人这么多年对敖东的信任，刚刚曾老师说的那个“70岁老人凭身份证多送一瓶”的福利，我在这里给大家盖个章，绝对有效！","这次为什么会有这场直播？第一，敖东70周年，厂家给大家送福利；第二，客服反馈大家需求量很大，想要个更划算的价格，所以我今天专程来给大家破价。先给各位叔叔阿姨发个红包吧！","（第一轮红包）","【曾老师】家人们，红包已经发了，没抢到的别急，整点还有。孙总，我替大家问一句，今天到底凭什么便宜？","【孙总】凭两点：第一，70周年庆，集团给了政策；第二，今天工厂直发，没有中间商。便宜不是产品打折，是把中间那一道省下来给大家。","【曾老师】我补一句，我是营养师，平时看配方成分、看检测报告多，今天产品这块我给大家讲透，价格这块让孙总给到底。","中控配合：配合主播助播指令发红包；公屏置顶“70周年庆·厂家直供”；新人进房欢迎语带“扣70”。","环节2：痛点唤醒（4—7分钟）","环节内容：让血脂偏高的人对号入座，愿意停下来听；曾老师再形象比喻，痛点递进与放大，讲透危害，抛出核心矛盾，为孙总谈福利做铺垫。","话术参考：","【曾老师】叔叔阿姨，说到产品，咱们先聊聊大家现在的身体状态。我刚刚看到很多家人的留言，特别真实。有的说头沉发闷舒服一些了，有的说坚持下来状态稳很多。","但今天新进直播间的叔叔阿姨，咱们扪心自问一下，您有没有这四个情况？我不吓唬人，就做个小测试，中了的在屏幕上扣个“中”：","第一，去年体检报告单上，“低密度脂蛋白”或者“甘油三酯”后面，是不是跟着一个向上翘的小箭头？","第二，吃完饭特别容易犯困，往沙发上一坐就不想动，一到下午脑袋发沉、发闷？","第三，爬两层楼就得歇一歇，腿发沉，走快了觉得胸口发紧、气不够用？","第四，平时口味偏重，爱吃肉爱吃油，又经常坐得多、动得少？","来，公屏上打出来，您中了几条？","【孙总】曾老师，公屏上“中”已经刷起来了，好多家人四条全中。","【曾老师】四条全中的家人，我不跟您说吓人的话，我只说一句：千万别拖！","很多家人指标偏高了，身上没有难受，就觉得不用管，这是很大的误区！大家想想，咱们家里的自来水管，用了几十年，管壁上是不是会悄悄结一层水垢？咱们的血管也是一样的，油脂悄悄沉积，慢慢变窄，它不是一天形成的。","血脂高不是小毛病，它不疼不痒，最容易被当成小事。但一旦堵在心上、堵在脑上，那可能就是三五秒钟的事情；如果脂肪堆积在肝里，硬化了，咱们看不见；但如果影响到了眼睛和手脚，轻点走路画圈，重点可能就直接躺在床上了，吃喝拉撒都要人伺候。人上了年纪怕啥？第一怕自个身体不好，第二怕给家人添负担。真到了那个时候，花的就不是几十几百，而是几万几十万了，钱花光了人还遭罪，全家跟着受拖累。","但是，我今天也要把话说清楚（严正声明）： 如果您现在有头晕、手麻脚麻、胸口闷、说话不利索，第一件事是去医院查！别在直播间买保健品当药吃，药的事归医生。我们今天讲的，是查完之后、指标偏高、医生也让您注意饮食和运动的这种情况下，日常怎么养护。","【曾老师】既然是日常养护，那就有个很现实的问题。我刚刚看到留言，不少扣1的家人，吃到后面停了，核心就是三个字：舍不得、吃不长、总断档。","血管养护，最怕断断续续！吃几个月停两个月，刚稳住又堆积，钱花了，调理效果很难持续。养护拼的不是吃几天，是长期稳定。","想要长期坚持，只有两个关键点：第一，单价够实在；第二，一次拿到足量。","孙总，您说是不是这个道理？如果价格高、量又少，大家就算认可敖东植物甾醇银杏叶片，觉得效果好，也很难长期坚持啊。","【孙总】道理没错，但是原料成本、产能摆在这，平时的活动机制已经是底线了。","【曾老师】所以今天，趁着咱们敖东70周年，咱们必须跟厂家申请一个“能吃得起、吃得好”的超大补贴！今天不仅有专项补贴，还要给足量！孙总，咱们今天必须给直播间的叔叔阿姨们交个底！","中控配合：每问一条，公屏引导“中”；同步弹出“本品不能代替药物”字幕条；把“四条全中”的评论置顶。","对应KT板：","KT板1（痛点板）：四个生活场景图标——体检箭头、饭后犯困、爬楼发沉、重油重盐；下方一行大字“不疼不痒，最容易被当成小事”。","环节3：品牌塑品（7—12分钟）","环节内容：塑品，讲银杏叶片产品价值 ，曾老师来讲透产品、服用方法，突出蓝帽 + 两大成分，继续铺垫，为谈判加码；孙总来讲品牌，敖东70年、中华老字号、上市公司、自有工厂，线上线下同款在售，给顾客建立专业信任后，让家人明白这瓶东西到底怎么起作用、为什么值这个价。","话术参考：","【曾老师】好，家人们，在跟孙总申请今天的70周年厂家补贴政策之前，咱们得先弄明白：这瓶东西到底怎么起作用的？为什么它值这个价？","今天咱们讲的，是敖东牌植物甾醇银杏叶片。瓶身上有个“蓝帽子”，批号是国食健注G20250013，国家批准的保健功能写得很清楚：有助于维持血脂健康水平。注意，是“维持”，它不是药，这是分界线。适合血脂偏高的叔叔阿姨，那它为什么管用？两个核心成分，我给大家用大白话讲透：","第一个叫植物甾醇，它的作用是“拦”。 它的结构和坏胆固醇长得像，吃进去后，就像厨房里的吸油纸，或者排队时前面先站了个人，把肠道里的位置占住，让多余的油脂少吸收一点。","第二个叫银杏叶提取物，它的作用是“护”。 它里面的总黄酮醇苷，干的是日常养护的活儿。上了年纪循环慢，容易发沉发困，它能帮着日常养一养。","含量我不空口说，全印在瓶身上：每100克含植物甾醇35克，吃8片就有1.1克左右。","怎么吃？大家记好：每次4片，一天2次，饭后吃，早晚各一次，规律坚持效果才好。","【孙总】曾老师我看有家人在问，在吃降脂药，还能不能吃这个？","【曾老师】问得好。第一，药不能停，听医生的；第二，要吃，跟药错开半小时以上，像吃阿司匹林、华法林的，错开1-2小时，安全永远第一。大家记住了啊，保健食品不是药物，不能代替药物治疗疾病！","【曾老师】还有家人问，鱼油、卵磷脂要不要一起吃？可以搭，但别一把一把地吃，按说明来，别叠加过量。营养这事，讲究的是够用，不是越多越好。","【孙总】曾老师讲得很严谨啊。我看公屏上有家人问，这牌子到底靠不靠谱？今天我来给大家交个实底，咱们用实力说话。","大家看这个（桌上放的老字号牌）还有背后大屏幕（示意大家看背景视频）：","第一，中华老字号！敖东是正儿八经被国家商务部盖章认证的中华老字号。第二，上市企业，咱们的股权代码是000623，这都是能在股市上查得到的真金白银。第三，在2024年中国医药市场药企排行榜里，咱们吉林敖东排在百强第58位！品牌价值更是高达117.78亿！","咱们不仅有自己的科研大楼、自有工厂，从原料筛选到生产质检，每一步都是严格把控。大家买东西，最怕买到“查不到出处”的。这款产品，线下药店、线上平台都有同款在卖，大家随时可以去对比。70年的大厂，靠的就是品质和口碑，咱们绝对不忽悠！","【曾老师】 好，家人们，大家听明白了吧？中华老字号、上市企业、医药百强、百亿品牌价值！70年大厂底蕴，加上国家蓝帽认证、实打实的成分。既然东西这么靠谱，孙总，那咱们今天就得说点实在的了。刚才公屏上好多家人在说，产品好是好，但要想长期吃、不断档，就怕价格高、量又少，吃几个月停了，钱花了效果没稳住。","那孙总，我看很多家人都是想买，想坚持吃，就是价格让他们有点犹豫，那这次敖东70周年，您看是不是得拿出一份能让普通人吃得起、不心疼、能坚持的方案！","【孙总】我也知道大家需要长期吃，回馈家人肯定要回馈，但原料成本摆在这，咱们得有个可控的方案……","中控配合：弹“国食健注G20250013”特写；弹瓶身“保健功能：有助于维持血脂健康水平”；把“本品不能代替药物”固定在屏幕下方。","对应KT板+老字号牌：","KT板2（资质板）：蓝帽图标 + “国食健注G20250013”；“国家市场监督管理总局批准”；“保健功能：有助于维持血脂健康水平”；“适宜人群：血脂偏高者；底部“中华老字号 · 上市公司 · 线上线下同款在售”。","环节4：破价算账（12—17分钟）","环节内容：先报线上日常价79.9一瓶；27瓶原价2157；总部申请，今天下单买27瓶送27瓶，到手54瓶，把量做足；再由孙总破价，直降777，最终1380；再讲加赠：之前预付10元的顾客送3瓶、直播间下单再送3瓶，到手60瓶，为什么设这样的量；算单价23，一天8片约不到8元，约2.9折，然后让顾客找健康顾问/客服下单。","话术参考：","【曾老师】成分和资质咱们都讲透了，接下来聊聊大家最关心的——今天到底什么价？这个价我可定不了，得孙总来拍板。他是厂家品牌运营总监，来，咱们看看孙总今天到底带了多大的诚意！","【孙总】曾老师，各位家人，咱们不玩虚的。这款敖东植物甾醇银杏叶片，一瓶 24 片，一天 8 片，3 天一瓶。平时咱们线上日常价79.9一瓶，我不藏着掖着，大家随时可以去查。","【孙总】今天我不一瓶一瓶给大家上，直接上27瓶的大套餐。27乘79.9，原价多少？2157 块。这是大家平时一瓶一瓶去买，实打实要花的钱。不过曾老师，在报今天这机制之前，我觉得你得先给家人们科普一下，为什么咱们今天要上这么大的量？","【曾老师】通常3 个月，是一个基础小周期。给身体一段持续调养的时间，也正好对上复查节点，到点去医院查一次，看指标、看状态。","【曾老师】6 个月，是两个小周期叠起来，一个巩固大周期，先打底，再稳住。很多人不是不认可产品，是吃两个月停一个月，刚稳一点又断了，钱花了，劲儿却接不上。","【曾老师】血脂这事，不光看血管，腰围、内脏脂肪、饮食、运动，都得一起管。它不是一天形成的，也别指望几天就变。真要养，就按 6 个月来，别断档。","【孙总】曾老师这话在理。所以这次 70 周年，我专门跟总部申请了一个政策：今天下单，买 27 瓶，直接送 27 瓶！27 加 27，54 瓶。总部特批这个量，就是让大家能连着吃、别断。","【曾老师】买 27 送 27，到手 54 瓶！量是够了。但是孙总，您看看公屏，好多人还在刷“价格还能不能再实在点？”“光有量不行，价还得降！”您今天既然是专程来破价的，这个价您得给家人们露个底。","【孙总】曾老师，你这是给我出难题。买 27 送 27，已经是总部咬着牙批的了。原料成本、产线成本摆在这儿，再动价，我回去不好交代。","【曾老师】孙总，厂家要生存，我理解。但今天是敖东建厂 70 周年，直播间都是跟了咱们很久的老粉，真心想长期吃。您是品牌运营总监，这个价您现场就能拍板，别让家人们带着遗憾走。","【孙总】唉……你这话说到这份上了。行，为了老粉，我今天再破个例，既然今天我是专程来给 70 周年撑场、给家人们谋福利的。总部给的是量，我今天破个价——2157 块，70 周年，我现场直降 777 块！最后 1380 块！","【曾老师】家人们听到没有！1380 买 54 瓶！孙总真是拼了，这价格简直不敢想！才3 折啊！","【曾老师】但是孙总，我这儿还有个事。咱们直播有很多是提前付了10块钱定金的家人，那是真信任咱们。现在虽然破价了，到手是 54 瓶，您看对这些提前交定金的家人，是不是还能额外给点专属福利？不然对不起人家这份信任。","【孙总】曾老师，你今天是真不让我下播了啊！1380 块 54 瓶已经够实惠了，你还要加福利，这让我回去咋交代啊？最多……我只能给预付定金的家人额外加送 3 瓶！","【曾老师】孙总，3 瓶哪够啊，既然是送，您就大气点！预付的送 3 瓶，那今天在直播间刚下单的家人呢？您也一视同仁，再给刚拍的加送 3 瓶，凑个整！54 加 3 加 3，直接给家人们上 60 瓶！您看行不行？","【孙总】（面部纠结了一会）行！曾老师，我今天算是彻底被你拿下了！54 瓶再加 6 瓶，60 瓶！1380 块拿 60 瓶！60瓶，正好一个巩固大周期、半年的量。对了，今年满 70 周岁的长辈，凭本人身份证，在 60 瓶之外再送 1 瓶，不占套餐的数。家里有 70 岁老人的，等于 61 瓶拿回家，多的这 1 瓶，是敖东给长辈的敬礼。下单备注“70岁”，找健康顾问核对就能额外送了！咱也先说好，这个机制只限今天直播间70 周年庆这一场！下播恢复79.9一瓶，绝不再送！","【曾老师】痛快！60 瓶！家人们，咱们来算笔账：1380 除以 60，平均一瓶只要23块！平时79.9，今天23！不到 3 折！一天吃 8 片，花不到 8 块钱，这 60 瓶把半年的量一次备齐，也省得吃一半又断！而且这价格，全网找不出第二个！这个机制，只有今天、只有 70 周年这一场，想要这 60 瓶的家人别犹豫，立刻联系你的健康顾问下单，错过今天，就没有这个福利了！","【曾老师】孙总，今天场子太火了，有叔叔阿姨一直在刷屏说怕抢不到，咱们今天总共放多少个名额？","【孙总】今天 70 周年，工厂备货紧，直播间专属名额只有 500 个！抢完马上恢复79.9单瓶，赠品全没！大家需要的赶紧找健康顾问下单。","【曾老师】只有500个名额，家人们，名额有限，先到先得，赶紧联系您的健康顾问锁定名额！","【曾老师】（重点提醒70岁福利）好了，再次提醒一下大家开场说的大福利！刚才孙总已经盖章确认，咱们直播间只要今年是70岁的叔叔阿姨，今天下了单，去找您的健康顾问出示一下身份证，厂家额外再送您一瓶银杏叶片！这是咱们敖东建厂70周年给老寿星们的专属敬礼！符合条件的家人们，付款时千万别忘了跟顾问说一声！","【曾老师】最后再重复一遍：1380元，60瓶，今年70岁老人得61瓶，一瓶到手23块，一天花不到8块钱，买的是敖东大厂70年的品质，也是半年的规律养护。各位叔叔阿姨、大姐们，养护不是一天两天的事，别等，别断，也别犹豫了。现在联系您的健康顾问下单，把名额锁上，下了播就恢复79.9元一瓶，也不再送了。","中控配合：置顶“27瓶+送27瓶+再送6瓶=60瓶”；1380元到手60瓶字样。","对应KT板：","KT3（算账板）：原价79.9元/瓶；27瓶原价2157；总部批买27瓶送27瓶；孙总破价直降777→1380；预付10元+直播下单再送6瓶=60瓶；底部一行“60瓶 · 23元/瓶。","环节5：库存+有限名额逼单（17—26分钟）","环节内容：曾老师报库存与本场名额；孙总确认机制不再加码；曾老师讲60瓶半年账；按50—60岁、60—70岁、70岁以上三段讲吃法和注意事项；讲保价和10元预付规则；念已购、倒计时收单。","话术参考：","【曾老师】1380元60 瓶、23一瓶。孙总，这个价今天就是到底了？后面不会再有第二回了吧？","【孙总】到底了。买 27 送 27，再直降 777，再送6瓶，利润已经让穿了。这个机制就这一场，下播就收回。","【曾老师】家人们，这个账我再说一遍：60瓶，一天8片，一瓶3天，整整半年。半年，1380，一天不到8块。您去门店、去线上买一瓶79块9，今天直播只要23，还送到家。","【曾老师】已经下单的家人，公屏扣“已购”，把省份也打上，让孙总看看到底哪些省的老朋友在支持。","【曾老师】我再讲讲怎么吃，我是营养师，这个得说细一点。","50到60岁的，代谢开始慢下来，重点是“查+控”。一天2次、一次4片，饭后温水，先按3个月吃，3个月去复查一次，听医生的，该调药调药，别自己停，也别自己吓自己。","60到70岁的，身体机能不如从前，重点是“稳”。别今天吃明天忘，规律吃，少油少盐，走走路，规律这件事比什么都强。","70岁以上的，很多人还有血压、血糖的问题，重点是“养”。该吃的药一顿不能落，这个产品是日常养护，不是替药。家里人要盯着，别让老人自己乱停。","【孙总】我补一句，70岁以上的家人，儿女给买的，一定盯着吃，别放在柜子里忘了。","【曾老师】有家人问，60瓶会不会太多？","【曾老师】不多。一瓶3天，60瓶180天，正好半年。保健食品最怕吃两天就停，既然要养，就按周期来。半年，正好从冬天吃到明年开春。","【曾老师】来，中控（洋洋）给我个实数：现在还剩多少名额？（报个数）还剩351个。","【曾老师】我也不催大家，但大家要知道，名额随时消失。本场只放 500 个名额 —— 不是 5000，也不是无限卖。70 周年这批货，工厂就批下来 500 份，多一份都调不出来。","【曾老师】而且就在刚刚说的这一小会儿，名额又减了50多名，这会儿已经二百几了。大家要真想要，别在公屏问 “还有没有”，直接找健康顾问把名额锁上 —— 您问一句的工夫，可能就少一个。","【孙总】我这边也交个底：500 个名额，走完就没了。也加不了，也别找我加，批不下来。卖完恢复 79.9 单瓶，买 27 送 27 没有，直降 777，额外送的都没有。","【曾老师】家人们听见没？孙总把话都说到这份上了，多一份都批不出来！来，已经付款成功的家人，公屏上把【已购】刷起来，让孙总看看咱们的实力！还没拍的，看到大家都买了，您还犹豫啥？","【孙总】我把保价也说清楚：保价全年，买贵退差价。今天拍，不用担心后面更便宜。","【曾老师】预付10元，尾款1370，货到付给快递员。先付10元锁名额的，收到货再付尾款，不满意按流程退就行。","中控配合：实时播报库存与剩余名额；每30秒弹一次“买27送27·本场限量”；已下订单念ID与省份；倒计时贴片常驻。","对应KT板：","KT3（算账板）：原价79.9元/瓶；27瓶原价2157；总部批买27瓶送27瓶；孙总破价直降777→1380；预付10元+直播下单再送6瓶=60瓶；底部一行“60瓶 · 23元/瓶。","环节5附加：驼绒被抽奖逼单话术（17—26分钟）","环节内容：曾老师通过抽奖逼单+福利加码，随机抽3人送驼绒被，体现驼绒被的价值，原价798元，现在直播免费送，来刺激还未下单的家人，同时给已经下单的家人吃定心丸，拉起直播间最后一波高潮。","【曾老师】家人们，先停一下手里的动作！听我说！1380到手60瓶，平均一瓶23块，还有没拍的吗？刚孙总说了，机制绝对不加了，但今天我既然把大家当自家人，必须再给大家添把火！","【曾老师】咱们现在马上抽个奖！随机抽3位幸运家人，我直接每人送一床价值398元的纳米级驼绒被！（曾老师把驼绒被实物拉近镜头，用手捏一捏展示）","大家看这厚度，这材质！这被子在商场里，标价实打实就是798元！100%优质驼绒，贴身不压身，吸湿防寒、干爽透气，循环锁温，盖着轻、暖、不闷。今天咱们直播间，咱一分钱不要，直接抽奖免费送！这天一天比一天凉，拿回去冬天盖正合适，暖和又舒服！孙总，我这波福利给得够到位吧？","【孙总】（笑着配合，肯定价值）这被子我看了，这面料、这做工，绝对是高档货，值这个价！ 曾老师，你这波福利给得是真给力，够实在！咱们厂里发员工福利，买的也是这种！","【曾老师】 谢谢孙总认可！大家听好怎么参与：看到公屏上弹出的“抽奖图标”了吗？现在立刻点击这个抽奖图标，输入您的“姓名+电话”，点提交，您就有资格了！系统会自动把您的名字放进抽奖池，到时候咱们随机抽，抽中直接给您送驼绒被！","【曾老师】已经下单拍完60瓶的家人，赶紧去点图标填信息！还没拍的家人，您还在等什么？23块钱一瓶的敖东银杏叶片，全网找不到比它更低的价了，今天不拍，明天马上恢复79块9！现在立刻去联系健康顾问下单，拍完了赶紧回来点抽奖图标填信息！","【曾老师】公屏上“已填”刷起来！让孙总看看咱们的热情！咱们倒数5个数，马上开抽！5、4、3、2、1！停！恭喜这3位填了信息的幸运家人，驼绒被给您安排上！没抽到的家人别灰心，您现在去把单拍了，23块一瓶拿到手，省下来的钱自己买被子都划算！还没拍的，抓紧最后时间！","【曾老师】 来，已经付款成功的家人，公屏上把【已购】刷起来，让孙总看看咱们的实力！","【曾老师】 倒计时3分钟！我看后台，刚才这几分钟又走了XX（报数）个，现在真的只剩最后XX（报数）个名额了！1380，60瓶，一瓶23，这个账您自己算。","【曾老师】 最后一遍：还剩XX个名额，卖完，到时间就下播，恢复79块9。想要的，现在就找健康顾问锁定名额！70岁的叔叔阿姨，别忘了把身份证发给顾问，多领一瓶！","环节6：抽奖收尾（26—30分钟）","环节内容：曾老师烘托气氛，发最后一波红包与截屏送植物甾醇银杏叶片抽奖福利，倒计时，融合逼单，最后感恩收尾+预告下一轮","【曾老师】家人们，马上到整点了！咱们这轮的最后一大波红包马上发，大家准备好拼手速！","（发最后一波红包）","【曾老师】抢完红包，紧接着就是咱们这一轮最后一次截屏抽奖！截到的前5位家人，一人直接送1瓶咱们同款的植物甾醇银杏叶片！","来，全体注意，3、2、1，截屏——开始！恭喜这5位家人，一人一瓶！没截到的别急，今天下单的也赚了，足量了，按说明吃，坚持半年就能看到效果了。","【曾老师】还在犹豫的叔叔阿姨，我最后强调三句话：","第一，血管养护不能断断续续，今天这个低价，是我跟孙总争取又争取才谈下来的，是妥妥给大家的福利！","第二，福利仅限今天，名额不预留，付款晚了，名额抢完就没了！","第三，吃法再记一遍：每次4片，一天2次，饭后服用。","【曾老师】最后提醒一句，家里有70岁长辈的，身份证备好，下单备注“70岁”，那1瓶额外的一定要领，别浪费。","好了，时间不多了，跟着我倒计时：5、4、3、2、1！","想要的家人，现在抓紧找你的健康顾问下单！付款完成的家人，立刻在公屏打出【已购】，我们优先给您安排发货！","【曾老师】也再次感谢孙总拿出这么大的周年福利！孙总，今天为了给咱们直播间争取这些补贴，您也辛苦大半天了，口干舌燥的，赶紧先去后台休息喝口水吧，接下来的场子交给我！","【孙总】（笑着回应）行，曾老师，那我先去歇会儿。各位家人，没抢到福利的赶紧去拍，咱们直播间福利不断，辛苦曾老师了！","【曾老师】 也谢谢所有叔叔阿姨，敖东70载感恩相伴！没赶上的家人别着急，咱们30分钟一轮循环，红包和抽奖还有，福利政策不变！","中控配合：截屏抽奖用公屏截图留证；中奖名单置顶；下一轮开场时间贴片；循环结束前30秒预告。","四、互动问题应答（FAQ）","直播间的提问，统一按下面的话答，不自由发挥、不临场加码。答不上来的，让家人把瓶子拍给医生或营养师。","五、合规红线与禁语替换","这场是保健食品直播，信任比成交重要。下面这类话，曾老师、孙总、中控尽量都不说，避免可能整场被限流甚至封禁。","1、冶病、治好","2、不用吃药了、可以停药","3、无副作用、绝对安全、人人能吃","4、全面最低、最便宜，绝对极限词","六、物料清单：","产品实物样品6瓶：用于讲成分、抽奖、展示所用。","KT板1—4，按环节顺序摆放，确保镜头内可见。","红包300元，分3轮发；抽奖登记表；截屏工具。","驼绒被样品1床，用于抽奖展示。"]};
+
+function hashLines(lines){
+  const str = lines.join("\u0001");
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return h.toString(36) + "-" + str.length;
+}
+function getHist(){ try { return JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); } catch(_){ return []; } }
+function setHist(a){ try { localStorage.setItem(HIST_KEY, JSON.stringify(a)); } catch(_){} }
+
+function saveHist(lines, title){
+  const arr = getHist();
+  const key = hashLines(lines) + "|" + title;
+  const now = new Date();
+  const rec = {
+    id: key,
+    title: title || ((BLOCKS[0] && BLOCKS[0].name ? BLOCKS[0].name : "未命名脚本") + " · " + now.toISOString().slice(5,10)),
+    date: now.toISOString().slice(0,10),
+    ts: now.getTime(),
+    lines, len: MAXLEN, bold: boldOn,
+    blocks: BLOCKS.length, cues: BLOCKS.reduce((n,b)=> n + b.cues.length, 0)
+  };
+  const i = arr.findIndex(x => x.id === key);
+  if (i >= 0){ rec.date = arr[i].date; arr.splice(i,1); }
+  arr.unshift(rec);
+  if (arr.length > 30) arr.length = 30;
+  setHist(arr);
+  renderHist();
+  return key;
+}
+
+function seedHist(){
+  if (getHist().length) return;
+  try {
+    const parsed = parseScript(SEED.lines);
+    setHist([{
+      id: hashLines(SEED.lines) + "|" + SEED.title,
+      title: SEED.title, date: SEED.date, ts: Date.parse(SEED.date + "T09:40:00"),
+      lines: SEED.lines, len: 52, bold: true,
+      blocks: parsed.blocks.length, cues: parsed.blocks.reduce((n,b)=> n + b.cues.length, 0)
+    }]);
+  } catch(_){}
+}
+
+function renderHist(){
+  const arr = getHist();
+  const box = $("hist");
+  if (!arr.length){ box.innerHTML = '<div class="empty">还没有历史脚本，生成一次就会出现在这里。</div>'; return; }
+  box.innerHTML = arr.map(x => `
+    <div class="hitem" data-id="${esc(x.id)}">
+      <span class="hdate">${x.date}</span>
+      <span class="htitle">${esc(x.title)}</span>
+      <span class="hmeta">${x.blocks} 板块 · ${x.cues} 句</span>
+      <button class="del" title="删除">×</button>
+    </div>`).join("");
+
+  box.querySelectorAll(".hitem").forEach(el => {
+    const rec = getHist().find(x => x.id === el.dataset.id);
+    el.onclick = e => {
+      if (e.target.classList.contains("del")) return;
+      if (!rec) return;
+      $("optTitle").value = rec.title || "";
+      $("optLen").value = rec.len || 52;
+      $("optBold").checked = rec.bold !== false;
+      if (rec.blocks && rec.blocks.length){ loadBlocks(rec.blocks, rec.id); }
+      else { generate(rec.lines); }
+    };
+    el.querySelector(".del").onclick = e => {
+      e.stopPropagation();
+      setHist(getHist().filter(x => x.id !== el.dataset.id));
+      renderHist();
+    };
+  });
+}
+
+$("btnClearHist").onclick = () => {
+  if (!getHist().length) return;
+  if (!confirm("清空全部历史脚本？此操作不可恢复。")) return;
+  setHist([]); renderHist();
+};
+
+/* ================= 6. 交互 ================= */
+let pending = null;   // { lines, title }
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+/* 三态：drop / 解析中 / 解析完成 */
+function showDropState(){
+  pending = null;
+  $("importCard").classList.remove("busy","ready");
+  $("pFill").style.width = "0";
+}
+function showParsing(name){
+  $("importCard").classList.remove("ready");
+  $("importCard").classList.add("busy");
+  $("pName").textContent = name;
+  $("pState").textContent = "正在读取文件…";
+  $("pFill").style.width = "12%";
+}
+function showDone(name, parsed){
+  $("importCard").classList.remove("busy");
+  $("importCard").classList.add("ready");
+  const total = parsed.blocks.reduce((n,b)=> n + b.cues.length, 0);
+  $("dName").textContent = name;
+  $("dMeta").textContent = `已解析 ${parsed.blocks.length} 个板块 · ${total} 句 · ${parsed.speakers.map(s=>s.label).join(" / ") || "无说话人"}`;
+  $("stat").innerHTML = `已就绪：<b>${parsed.blocks.length}</b> 个板块 · <b>${total}</b> 句`;
+}
+
+async function handleFile(f){
+  $("optTitle").value = "";
+  showDropState();
+  showParsing(f.name);
+  const t0 = performance.now();
+  try {
+    const isDocx = /\.docx$/i.test(f.name);
+    const lines = isDocx ? await docxToLines(f) : textToLines(await f.text());
+    $("pState").textContent = "正在拆分板块与句子…";
+    $("pFill").style.width = "62%";
+    await delay(120);
+    const parsed = parseScript(lines);
+    if (!parsed.blocks.length) throw new Error("没解析到台词，检查「环节1：xx（0—4分钟）」和【说话人】");
+    $("pFill").style.width = "100%";
+    const wait = Math.max(0, 620 - (performance.now() - t0));   // 让动画看得见，但不拖沓
+    await delay(wait);
+    const title = extractTitle(lines) || f.name.replace(/\.[^.]+$/,"").trim();
+    $("optTitle").value = title;
+    pending = { lines, title };
+    showDone(f.name, parsed);
+  } catch (err){
+    showDropState();
+    $("stat").innerHTML = "<b style='color:#d70015'>解析失败</b>　" + err.message;
+  }
+}
+
+/* 视图切换：淡出淡入，不硬跳 */
+function enterPrompter(){
+  $("setup").classList.add("leaving");
+  setTimeout(()=>{
+    $("setup").style.display = "none";
+    $("setup").classList.remove("leaving");
+    $("prompter").classList.add("on");
+    requestAnimationFrame(()=> $("prompter").classList.add("shown"));
+  }, 230);
+}
+function leavePrompter(){
+  $("prompter").classList.remove("shown");
+  setTimeout(()=>{
+    $("prompter").classList.remove("on");
+    $("setup").style.display = "flex";
+    $("importCard").classList.remove("busy","ready");
+    document.querySelector("#setup .inner").style.opacity = "0";
+    requestAnimationFrame(()=>{ document.querySelector("#setup .inner").style.opacity = "1"; });
+  }, 260);
+}
+
+/* 载入一份（可能被编辑过的）板块数据 */
+function loadBlocks(blocks, key){
+  BLOCKS = JSON.parse(JSON.stringify(blocks));
+  BLOCKS.forEach(b=>{                                  // 倒计时 = 区间时长（结束 - 开始）
+    const m = /(\d+)\s*[—\-–~至]\s*(\d+)/.exec(b.win || "");
+    if (m) b.dur = (+m[2] - +m[1]) * 60;
+  });
+  const classes = ["sp zeng","sp sun","sp s3","sp s4"];
+  const colorOf = { "sp zeng":"#0071e3", "sp sun":"#e08a1e", "sp s3":"#8a5cf6", "sp s4":"#1a9e63" };
+  SP = { go:["切下一板块","sp go"], ctl:["中控配合","sp ctl"] };
+  const order = [];
+  BLOCKS.forEach(b => b.cues.forEach(c=>{
+    const sp = c[0];
+    if (sp && !SP[sp]){
+      const cls = classes[Math.min(order.length, classes.length-1)];
+      SP[sp] = [sp, cls, colorOf[cls] || "#8e8e93"];
+      order.push(sp);
+    }
+  }));
+  SP.__order = order;
+  currentKey = key || null;
+
+  const title = $("optTitle").value.trim();
+  $("brand").innerHTML = title ? `<b>${esc(title)}</b>` : "<b>提词屏</b>";
+  document.title = (title ? title + " · 提词" : "直播提词 · 工作台");
+
+  bi = 0; left = BLOCKS[0].dur; running = false; editing = false;
+  $("btnEdit").classList.remove("on"); $("btnEdit").textContent = "编辑";
+  $("saveHint").textContent = "";
+  render();
+  enterPrompter();
+}
+
+/* 侧边栏收起 / 展开 */
+function setRail(collapsed){
+  $("rail").classList.toggle("collapsed", collapsed);
+  $("railToggle").setAttribute("aria-expanded", String(!collapsed));
+  localStorage.setItem("tyc_rail", collapsed ? "1" : "0");
+}
+$("railToggle").onclick = () => setRail(!$("rail").classList.contains("collapsed"));
+setRail(localStorage.getItem("tyc_rail") === "1");
+$("btnEdit").onclick = () => setEditing(!editing);
+$("btnSave").onclick = () => saveNow(true);
+$("cues").addEventListener("input", onEditInput);
+$("drop").onclick = () => $("file").click();
+$("file").onchange = e => { const f = e.target.files[0]; if (f) handleFile(f); e.target.value = ""; };
+
+["dragenter","dragover"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave","drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+
+$("btnEnter").onclick = () => { if (pending) generate(pending.lines, pending.title); };
+$("btnReselect").onclick = () => {
+  pending = null;
+  $("optTitle").value = "";                 // 重新选择就把标题一起清掉
+  $("stat").textContent = "等待导入…";
+  showDropState();
+  $("file").click();
+};
+
+$("btnGen").onclick = () => {
+  const text = $("paste").value.trim();
+  if (!text){
+    const saved = localStorage.getItem("tyc_lines");
+    if (saved){ try { const l = JSON.parse(saved); if (Array.isArray(l) && l.length){ generate(l); return; } } catch(_){} }
+    $("stat").textContent = "先拖入 docx，或把脚本文字粘到右边。";
+    return;
+  }
+  const ls = textToLines(text);
+  if (!$("optTitle").value.trim()) $("optTitle").value = extractTitle(ls) || "";
+  generate(ls);
+};
+
+$("btnBack").onclick = () => {
+  clearInterval(timer); running = false;
+  leavePrompter();
+  // 回到首页就清干净：标题、状态、左上角品牌、上次脚本缓存
+  $("optTitle").value = "";
+  $("stat").textContent = "等待导入…";
+  $("brand").innerHTML = "<b>提词屏</b>";
+  document.title = "直播提词 · 工作台";
+  localStorage.removeItem("tyc_title");
+  localStorage.removeItem("tyc_lines");
+  pending = null;
+  if (document.fullscreenElement) document.exitFullscreen();
+};
+$("btnDemo").onclick = () => {
+  $("paste").value = `环节1：暖场留人（0—4分钟）
+【曾老师】大家好，欢迎来到官方直播间！
+【曾老师】今天不是普通带货，是周年庆厂家直供专场。
+【孙总】我是厂家品牌运营总监，今天专程来给大家破价。
+中控配合：发首轮红包；置顶活动信息。
+环节2：痛点唤醒（4—7分钟）
+【曾老师】您有没有这四个情况？中了在屏幕上扣个「中」。
+【孙总】公屏上「中」已经刷起来了，好多家人四条全中。
+中控配合：引导公屏扣字；弹出提示字幕条。
+四、互动问题应答（FAQ）
+这一行之后的内容不会进入提词。`;
+  $("stat").textContent = "示例已填入，点「生成提词」看看效果。";
+};
+
+document.addEventListener("keydown", e=>{
+  if (!document.getElementById("prompter").classList.contains("on")) return;
+  if (e.target && e.target.tagName === "TEXTAREA"){
+    if (e.key === "Escape") e.target.blur();
+    return;                       // 编辑中不触发切换/计时快捷键
+  }
+  const ol = $("cues");
+  if (e.code === "Space"){ e.preventDefault(); toggle(); }
+  else if (e.key === "ArrowRight"){ go(bi + 1); }
+  else if (e.key === "ArrowLeft"){ go(bi - 1); }
+  else if (e.key === "ArrowDown"){ e.preventDefault(); ol.scrollTop += 120; }
+  else if (e.key === "ArrowUp"){ e.preventDefault(); ol.scrollTop -= 120; }
+  else if (e.key === "r" || e.key === "R"){ reset(); }
+  else if (/^[1-9]$/.test(e.key)){ if (+e.key <= BLOCKS.length) go(+e.key - 1); }
+  else if (e.key === "-" || e.key === "_"){ e.preventDefault(); bumpFs(-0.15); }
+  else if (e.key === "=" || e.key === "+"){ e.preventDefault(); bumpFs(0.15); }
+  else if (e.key === "f" || e.key === "F"){
+    document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  }
+});
+$("fsUp").onclick = () => bumpFs(0.15);
+$("fsDown").onclick = () => bumpFs(-0.15);
+
+/* 进入动画 + 回首页淡出 */
+document.querySelectorAll('a[href$=".html"]').forEach(a => {
+  a.addEventListener("click", e => {
+    e.preventDefault();
+    const href = a.getAttribute("href");
+    document.body.classList.add("leaving");
+    setTimeout(()=> location.href = href, 220);
+  });
+});
+
+/* 启动 */
+(function init(){
+
+  const saved = localStorage.getItem("tyc_lines");
+  if (saved){
+    try {
+      const l = JSON.parse(saved);
+      if (Array.isArray(l) && l.length){
+        $("stat").innerHTML = `上次的脚本还在（${l.length} 行），点「生成提词」直接开始，或重新导入。`;
+      }
+    } catch(_){}
+  }
+  applyFs();
+  seedHist();
+  renderHist();
+})();
+</script>
+</body>
+</html>

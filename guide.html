@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arvea · 使用说明</title>
+<link rel="icon" href="assets/logo-mark.svg" />
+<style>
+  :root{
+    --canvas:#ffffff;
+    --parchment:#f5f5f7;
+    --pearl:#fafafc;
+    --ink:#1d1d1f;
+    --ink-80:#333333;
+    --muted:#6e6e73;
+    --muted-48:#7a7a7a;
+    --hairline:#e0e0e0;
+    --primary:#0066cc;
+    --primary-hover:#0071e3;
+    --primary-soft:#f4f9ff;
+    --radius:18px;
+    --font:"OpenAI Sans","SF Pro Text",-apple-system,BlinkMacSystemFont,"Segoe UI Variable","Segoe UI","PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Cascadia Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--canvas);color:var(--ink);font-family:var(--font);
+    -webkit-font-smoothing:antialiased;letter-spacing:.01em;
+    opacity:0;transition:opacity .28s ease;
+  }
+  body.ready{opacity:1}
+  body.leaving{opacity:0}
+
+  .topbar{
+    position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;
+    height:56px;padding:0 28px;
+    background:rgba(255,255,255,.82);-webkit-backdrop-filter:saturate(180%) blur(18px);backdrop-filter:saturate(180%) blur(18px);
+    border-bottom:1px solid var(--hairline);
+  }
+  .topbar .mark{width:22px;height:22px;background:url("assets/logo-mark.svg") no-repeat center/contain}
+  .topbar .name{font-size:15px;font-weight:600}
+  .topbar .sub{font-size:13px;color:var(--muted)}
+  .topbar .sp{margin-left:auto;display:flex;gap:20px;font-size:13px}
+  .topbar a{color:var(--muted);text-decoration:none;transition:color .16s}
+  .topbar a:hover{color:var(--primary)}
+
+  .wrap{max-width:780px;margin:0 auto;padding:56px 24px 96px}
+
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:.12em;color:var(--primary);font-weight:600;margin-bottom:18px}
+  .eyebrow i{width:6px;height:6px;border-radius:50%;background:var(--primary);display:block}
+
+  h1{font-size:clamp(30px,4.4vh,44px);font-weight:700;letter-spacing:-.03em;line-height:1.15}
+  .lede{margin-top:14px;font-size:17px;line-height:1.65;color:var(--muted)}
+
+  h2{
+    font-size:22px;font-weight:600;letter-spacing:-.015em;
+    margin:56px 0 16px;padding-top:26px;border-top:1px solid var(--hairline);
+  }
+  h3{font-size:15.5px;font-weight:600;margin:26px 0 10px}
+  p{font-size:15px;line-height:1.8;color:var(--ink-80);margin:12px 0}
+  p.muted{color:var(--muted)}
+  ul,ol{margin:12px 0 12px 1.25em}
+  li{font-size:15px;line-height:1.85;color:var(--ink-80)}
+  b{font-weight:600;color:var(--ink)}
+  code{font-family:var(--mono);font-size:.9em;background:var(--parchment);border:1px solid var(--hairline);border-radius:6px;padding:1px 6px;color:#0b3f7a}
+
+  pre{
+    margin:16px 0;background:var(--pearl);border:1px solid var(--hairline);border-radius:14px;
+    padding:18px 20px;overflow:auto;font-family:var(--mono);font-size:13.5px;line-height:1.75;color:#2a2a2e;
+  }
+  pre .k{color:var(--primary)}
+  pre .c{color:#a1a1a6}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+  @media (max-width:720px){ .steps{grid-template-columns:1fr} }
+  .step{background:var(--pearl);border:1px solid var(--hairline);border-radius:14px;padding:16px 16px 14px}
+  .step em{font-style:normal;display:block;font-size:12px;color:var(--muted-48);letter-spacing:.08em;margin-bottom:8px}
+  .step b{display:block;font-size:14.5px;margin-bottom:6px}
+  .step span{font-size:13px;line-height:1.6;color:var(--muted)}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14.5px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--hairline);vertical-align:top}
+  th{font-weight:600;color:var(--ink);background:var(--pearl);font-size:13px;letter-spacing:.02em}
+  td{color:var(--ink-80)}
+  td code{white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+
+  .callout{
+    margin:18px 0;padding:14px 16px;background:var(--primary-soft);
+    border:1px solid #d8e8fb;border-radius:12px;font-size:14px;line-height:1.7;color:#0b3f7a;
+  }
+  .callout b{color:#0b3f7a}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;text-decoration:none;border:0;cursor:pointer;
+    font-family:inherit;font-size:15px;font-weight:500;color:#fff;background:var(--primary);
+    border-radius:9999px;padding:12px 24px;transition:background .18s ease,transform .18s ease;
+  }
+  .btn:hover{background:var(--primary-hover);transform:translateY(-1px)}
+  .foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--hairline);display:flex;gap:14px;flex-wrap:wrap}
+
+  @media (prefers-reduced-motion: reduce){ body{transition:none} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="mark"></span>
+  <span class="name">Arvea</span>
+  <span class="sub">使用说明</span>
+  <span class="sp">
+    <a href="index.html">首页</a>
+    <a href="studio.html">开始制作</a>
+  </span>
+</div>
+
+<div class="wrap">
+  <div class="eyebrow"><i></i>GUIDE · 提词工作台</div>
+  <h1>三步把脚本变成中控提词屏</h1>
+  <p class="lede">这个工具只做一件事：把直播脚本拆成「一句一行、标明谁在说」的提词，投在中控屏上，按板块计时。</p>
+
+  <div class="steps">
+    <div class="step"><em>STEP 1</em><b>拖进脚本</b><span>docx 直接拖，或把文字粘进去。</span></div>
+    <div class="step"><em>STEP 2</em><b>确认解析</b><span>看板块数、句数、说话人是否正确。</span></div>
+    <div class="step"><em>STEP 3</em><b>进入提词</b><span>点「进入提词」，全屏投到中控屏。</span></div>
+  </div>
+
+  <h2>脚本格式怎么写</h2>
+  <p>不需要特殊排版，用 Word 正常写就行。<b>最核心的一条：每段台词前面有「名字：」或「【名字】」，就能转。</b>板块标题只是让提词屏分段更准，没有也能跑。</p>
+
+  <h3>1. 板块标题</h3>
+  <p>三种写法都认，任选其一：</p>
+  <ul>
+    <li><code>环节1：暖场留人（0—4分钟）</code>——带起止分钟，倒计时按时长算。</li>
+    <li><code>00:00-08:00 曹医生开场｜问候回归</code>——时间轴写法，常见于整场脚本；<code>‑</code>、<code>-</code>、<code>—</code> 都行。</li>
+    <li><b>完全不写标题</b>——整篇会合成一个「整场」板块，照样能播。</li>
+  </ul>
+  <p>标题行里 <code>｜</code> 之后是注释，不会进板块名。</p>
+  <ul>
+    <li>时间里的连接符用 <code>—</code>、<code>-</code>、<code>~</code>、<code>至</code> 都能识别。</li>
+    <li>括号中英文都行：<code>（0—4分钟）</code> 或 <code>(0-4分钟)</code>。</li>
+    <li>写 <code>环节5附加：xxx（17—26分钟）</code> 会自动并回环节5，不单独成一个板块。</li>
+    <li>板块顺序、名称、时长都来自这些标题，右上角倒计时也按它算。</li>
+  </ul>
+
+  <h3>2. 说话人</h3>
+  <p>两种写法都认：</p>
+  <pre><span class="k">【曾老师】</span>叔叔阿姨早上好，欢迎来到直播间。
+<span class="k">【孙总】</span>大家好，今天专程来给大家破价。
+
+<span class="c">或者直接用冒号：</span>
+<span class="k">曹医生：</span>各位家人晚上好，我是曹医生。
+<span class="k">凡容老师：</span>大家好，接下来 10 期由我主讲。</pre>
+  <ul>
+    <li>名字随便起（2—6 个字最稳），出现顺序决定配色：第 1 个蓝、第 2 个橙、第 3 个紫、第 4 个绿。</li>
+    <li>冒号写法里，带「医生／老师／主持／助手／顾问…」这类角色的名字直接认；没有角色后缀的，出现两次以上也会认。</li>
+    <li>「时间：」「主题：」「注意：」这类不是说话人，会自动排除。</li>
+    <li>同一段里没写【】的独立段落，会归给上一位说话人。</li>
+    <li>不标说话人也行，只是提词屏上不显示标签；没带名字的段落会归给上一位说话人。</li>
+  </ul>
+
+  <h3>3. 一行一段</h3>
+  <p><b>一个自然段 = 提词里的一句。</b>所以脚本本身就要分好段，别把三句话写成一坨。工具还会再按句号、问号、分号、逗号二次切短，保证一行不超过设定字数（默认 52 字）。</p>
+
+  <h3>4. 中控动作</h3>
+  <p>想给中控的动作提示，单独写一行，以「中控配合：」开头，会收进该板块末尾的绿色卡片里，不混进台词：</p>
+  <pre><span class="k">中控配合：</span>发首轮红包；置顶「周年庆·厂家直供」；新人欢迎语带「扣70」。</pre>
+
+  <h3>5. 到哪停</h3>
+  <p>正文里出现 <code>四、</code>、<code>五、</code> 这类大标题就停止解析，后面的 FAQ、合规提示、物料清单都不会进提词。</p>
+
+  <div class="callout">
+    <b>最小可用示例</b>：照下面这段的写法，就已经能跑。
+  </div>
+  <pre><span class="k">环节1：暖场留人（0—4分钟）</span>
+<span class="k">【曾老师】</span>大家好，欢迎来到直播间，我是今天的主播。
+<span class="k">【曾老师】</span>今天不是普通带货，是厂家直供专场。
+<span class="k">【孙总】</span>我是厂家品牌运营总监，今天专程来破价。
+<span class="k">中控配合：</span>发首轮红包；置顶活动信息。
+<span class="k">环节2：痛点唤醒（4—7分钟）</span>
+<span class="k">【曾老师】</span>您有没有这四个情况？中了在公屏扣个「中」。
+<span class="k">四、互动问题应答</span>   <span class="c">← 这行之后不再解析</span></pre>
+
+  <h2>上传之后</h2>
+  <ul>
+    <li>拖进文件后先出现解析动画（转圈 + 进度条），完成后停在结果卡：<b>已解析 N 个板块 · M 句 · 说话人</b>。</li>
+    <li>解析时标题会自动填成文档里的大标题（第一行，去掉「直播话术脚本」等后缀）；想改就在标题框改。</li>
+    <li>确认无误点「进入提词」；不对就点「重新选择」，标题会一起清空。</li>
+    <li>每生成一次，自动存一条到「历史脚本」，下次点一下就重新载入；重复内容不会堆重复条目。</li>
+  </ul>
+
+  <h2>提词屏上怎么操作</h2>
+  <table>
+    <thead><tr><th style="width:26%">操作</th><th>键位 / 位置</th></tr></thead>
+    <tbody>
+      <tr><td>上下滚动</td><td>鼠标滚轮、<code>↑</code> <code>↓</code></td></tr>
+      <tr><td>切换板块</td><td><code>←</code> <code>→</code>，或点左侧板块列表；<code>1</code>—<code>9</code> 直跳</td></tr>
+      <tr><td>计时开始 / 暂停</td><td><code>空格</code></td></tr>
+      <tr><td>计时归零</td><td><code>R</code></td></tr>
+      <tr><td>调整字号</td><td><code>-</code> <code>=</code>，或右上角 <code>A−</code> / <code>A+</code>（会记住）</td></tr>
+      <tr><td>全屏</td><td><code>F</code></td></tr>
+      <tr><td>回导入页</td><td>左下角「首页」按钮</td></tr>
+      <tr><td>收起侧栏</td><td>侧栏右上角箭头按钮，或按 <code>[</code></td></tr>
+      <tr><td>改台词</td><td>右上角「编辑」，直接点句子改；改完点「完成」</td></tr>
+      <tr><td>保存改动</td><td>停止输入约 0.7 秒自动保存，也可点「保存」立刻存</td></tr>
+      <tr><td>回网站首页</td><td>左上角 Arvea 标志</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">倒计时按脚本里每个板块的<b>时长</b>计：写 4—7 分钟就从 3:00 开始倒数，写 17—26 分钟从 9:00 开始。到点会红边闪动提示「该切下一板块了」；最后一句也能滚到屏幕正中，方便念完收口。</p>
+  <p class="muted">编辑模式下，每句话、以及「切下一板块 / 中控配合」两张卡都能直接点改；改动会写回这条历史脚本，下次从历史打开还是你改过的版本。</p>
+
+  <h2>常见问题</h2>
+  <h3>提示「没解析到台词」</h3>
+  <p>九成是板块标题写错了。检查是否形如 <code>环节1：xxx（0—4分钟）</code>，以及台词是否用 <code>【】</code> 标了说话人。</p>
+  <h3>打不开 docx / 没反应</h3>
+  <p>只支持 <code>.docx</code>。老式 <code>.doc</code> 先在 Word 里另存为 docx。文件全程在本机浏览器里读，不联网。</p>
+  <h3>一行还是太长</h3>
+  <p>把「每行最多字数」从 52 调到 30—40，切得更碎；反之调大句子更完整。</p>
+  <h3>标题不是我要的</h3>
+  <p>标题取的是文档第一行大标题。想用别的，直接在标题框改，再点进入。</p>
+
+  <div class="foot">
+    <a class="btn" href="studio.html">开始制作提词 →</a>
+    <a class="btn" style="background:#fff;color:#0066cc;border:1px solid #e0e0e0" href="index.html">返回首页</a>
+  </div>
+</div>
+
+<script>
+document.body.classList.add("ready");
+document.querySelectorAll('a[href$=".html"]').forEach(a => {
+  a.addEventListener("click", e => {
+    e.preventDefault();
+    const href = a.getAttribute("href");
+    document.body.classList.remove("ready");
+    document.body.classList.add("leaving");
+    setTimeout(()=> location.href = href, 240);
+  });
+});
+</script>
+</body>
+</html>
