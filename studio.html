@@ -450,7 +450,7 @@
   </div>
 
   <div class="card hist">
-    <h2>历史脚本 <em>只在当前标签页，关闭即清空</em>
+    <h2>历史脚本 <em>保存在这台电脑的浏览器里</em>
       <span class="histbtns"><button class="ghost mini" id="btnExportHist">导出</button>
       <button class="ghost mini" id="btnImportHist">导入</button>
       <button class="ghost mini" id="btnClearHist">清空</button></span></h2>
@@ -942,11 +942,23 @@ async function generate(lines, titleOverride){
   currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""));
 }
 
-/* 历史与当前脚本只存在「当前标签页」：关掉标签即清空，别人再打开看不到 */
+/* 历史与当前脚本存在「这台电脑的浏览器」里：关标签/重启浏览器都还在；
+   换电脑、换浏览器、清缓存看不到，也不会传到服务器。
+   （旧版的标签页数据会自动迁移过来，不会白丢） */
 const SS = {
-  get(k){ try { return sessionStorage.getItem(k); } catch(_) { return null; } },
-  set(k,v){ try { sessionStorage.setItem(k,v); } catch(_){} },
-  del(k){ try { sessionStorage.removeItem(k); } catch(_){} }
+  get(k){
+    let v = null;
+    try { v = localStorage.getItem(k); } catch(_){}
+    if (v === null){
+      try {
+        const s = sessionStorage.getItem(k);
+        if (s !== null){ localStorage.setItem(k, s); v = s; }
+      } catch(_){}
+    }
+    return v;
+  },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(_){} },
+  del(k){ try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch(_){} }
 };
 /* ================= 5. 历史 ================= */
 const HIST_KEY = "tyc_hist_v1";
@@ -994,7 +1006,7 @@ function renderHist(){
   const arr = getHist();
   const box = $("hist");
   if (!arr.length){
-    box.innerHTML = '<div class="empty">当前标签页还没有历史脚本。生成后会临时存在这里，<b>关掉标签页即清空</b>；想长期保留请点「导出」存成文件。</div>';
+    box.innerHTML = '<div class="empty">这台电脑上还没有历史脚本。生成后会存在这里，<b>关掉页面、重启浏览器都还在</b>；换电脑或清缓存前，建议点「导出」留一份。</div>';
     return;
   }
 
