@@ -211,12 +211,15 @@
   .rail-toggle:hover{color:var(--blue);border-color:#c7d9f0}
   .rail-toggle:active{transform:scale(.94)}
   .rail-toggle svg{transition:transform .34s cubic-bezier(.4,0,.2,1)}
-  .rail.collapsed{width:62px}
+  .rail.collapsed{width:62px;min-width:62px;max-width:62px}
   .rail.collapsed .rail-toggle svg{transform:rotate(180deg)}
   .rail.collapsed .brand,
-  .rail.collapsed .legend,
-  .rail.collapsed .navbtn .nm,
-  .rail.collapsed .navbtn .tm{opacity:0;pointer-events:none}
+  .rail.collapsed .tagline,
+  .rail.collapsed #legendSpeakers,
+  .rail.collapsed .legend .hint{display:none}
+  .navbtn > .nvtxt{display:block;min-width:0;overflow:hidden;white-space:nowrap;transition:width .3s cubic-bezier(.4,0,.2,1),opacity .18s ease}
+  .rail.collapsed .navbtn > .nvtxt{width:0;height:0;opacity:0;overflow:hidden}
+  .rail.collapsed .rail-top{flex-direction:column;gap:8px;padding:0 0 8px;align-items:center}
   .rail .brand,.rail .navbtn .nm,.rail .navbtn .tm,.rail .legend{transition:opacity .2s ease}
   .rail.collapsed .navbtn{justify-content:center;padding-left:0;padding-right:0}
   .rail.collapsed .navbtn .no{min-width:0}
@@ -391,7 +394,7 @@ function renderNav(){
   $("nav").innerHTML = BLOCKS.map((b,idx)=>
     `<button class="navbtn${idx===bi?" on":""}" data-i="${idx}">
        <span class="no">${b.no}</span>
-       <span><span class="nm">${b.name}</span><span class="tm">${b.win}</span></span>
+       <span class="nvtxt"><span class="nm">${b.name}</span><span class="tm">${b.win}</span></span>
      </button>`).join("");
   $("nav").querySelectorAll(".navbtn").forEach(el => el.onclick = () => go(+el.dataset.i));
   const colOf = { "sp zeng":"#0071e3", "sp sun":"#e08a1e", "sp s3":"#8a5cf6", "sp s4":"#1a9e63" };
