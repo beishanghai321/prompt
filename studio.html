@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>直播提词 · 工作台</title>
+<link rel="icon" href="assets/logo-mark.svg" />
 <style>
   :root{
     --bg:#f5f5f7;
@@ -39,6 +40,11 @@
   #setup .inner{width:100%;max-width:1180px;margin:0 auto}
   #setup .top{margin-bottom:26px}
   #setup .top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+  .brandbar{display:flex;align-items:center;gap:9px;margin-bottom:20px}
+  .brandbar img{width:20px;height:20px;display:block}
+  .brandbar .bn{font-size:13px;font-weight:600;color:var(--ink);letter-spacing:.02em}
+  .brandbar .bt{font-size:12.5px;color:var(--ink-3)}
+  @media (max-width:640px){ .brandbar .bt{display:none} }
   .homebtn{
     display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
     font-size:13px;color:var(--ink-2);text-decoration:none;background:var(--surface);
@@ -204,6 +210,8 @@
   .rail .navbtn .tm,
   .rail .legend{transition:opacity .2s ease}
   .rail .brand{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rail .tagline{font-size:10.5px;line-height:1.6;color:#a1a1a6;padding:0 16px 10px;transition:opacity .2s ease}
+  .rail.collapsed .tagline{opacity:0;pointer-events:none}
   .rail.collapsed .navbtn{justify-content:center;padding-left:0;padding-right:0}
   .rail.collapsed .navbtn .no{min-width:0}
   .rail.collapsed .navbtn.on{background:transparent;border-color:transparent;box-shadow:none}
@@ -355,6 +363,12 @@
 <!-- ================= 导入 ================= -->
 <section id="setup">
  <div class="inner">
+  <div class="brandbar">
+    <img src="assets/logo-mark.svg" alt="Arvea" />
+    <span class="bn">Arvea</span>
+    <span class="bt">让每一句话，都在该说的时候出现</span>
+  </div>
+
   <div class="top">
     <div class="titles">
       <h1>直播提词 <span>工作台</span></h1>
@@ -449,6 +463,7 @@
       </button>
     </div>
     <div class="brand" id="brand"><b>提词屏</b></div>
+    <div class="tagline" id="tagline">让每一句话，都在该说的时候出现</div>
     <div id="nav"></div>
     <div class="legend">
       <div id="legendSpeakers" style="display:flex;flex-direction:column;gap:7px"></div>
