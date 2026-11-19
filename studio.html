@@ -527,6 +527,112 @@
 })();
 
 /* ================= 1. docx 解析 ================= */
+/* ---------- 纯 JS 解压（raw deflate），给没有 DecompressionStream 的老浏览器兜底 ---------- */
+function rawInflate(src){
+  const out = [];
+  let pos = 0, bitBuf = 0, bitCnt = 0;
+
+  function need(n){
+    while (bitCnt < n){
+      if (pos >= src.length) throw new Error("压缩数据不完整");
+      bitBuf |= src[pos++] << bitCnt; bitCnt += 8;
+    }
+  }
+  function get(n){
+    if (n === 0) return 0;
+    need(n);
+    const v = bitBuf & ((1 << n) - 1);
+    bitBuf >>>= n; bitCnt -= n;
+    return v;
+  }
+  function reverseBits(c, len){ let r = 0; for (let i = 0; i < len; i++){ r = (r << 1) | (c & 1); c >>= 1; } return r; }
+  function buildTree(lengths){
+    let maxBits = 0;
+    for (const l of lengths) if (l > maxBits) maxBits = l;
+    const blCount = new Array(maxBits + 1).fill(0);
+    for (const l of lengths) if (l) blCount[l]++;
+    const nextCode = new Array(maxBits + 1).fill(0);
+    let code = 0;
+    for (let b = 1; b <= maxBits; b++){ code = (code + blCount[b - 1]) << 1; nextCode[b] = code; }
+    const map = new Map();
+    for (let sym = 0; sym < lengths.length; sym++){
+      const len = lengths[sym];
+      if (!len) continue;
+      const c = nextCode[len]++;
+      map.set((len << 16) | reverseBits(c, len), sym);
+    }
+    return { map, maxBits };
+  }
+  function decode(tree){
+    let code = 0;
+    for (let len = 1; len <= tree.maxBits; len++){
+      code |= get(1) << (len - 1);
+      const sym = tree.map.get((len << 16) | code);
+      if (sym !== undefined) return sym;
+    }
+    throw new Error("霍夫曼解码失败");
+  }
+
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  const LE=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  const DE=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+
+  function inflateBlock(lt, dt){
+    for(;;){
+      const sym = decode(lt);
+      if (sym < 256){ out.push(sym); }
+      else if (sym === 256){ return; }
+      else {
+        const li = sym - 257;
+        if (li < 0 || li > 28) throw new Error("长度码错误");
+        const len = LB[li] + get(LE[li]);
+        const ds = decode(dt);
+        const dist = DB[ds] + get(DE[ds]);
+        const start = out.length - dist;
+        if (start < 0) throw new Error("回溯距离越界");
+        for (let i = 0; i < len; i++) out.push(out[start + i]);
+      }
+    }
+  }
+
+  let final = 0;
+  while (!final){
+    final = get(1);
+    const type = get(2);
+    if (type === 0){
+      bitBuf = 0; bitCnt = 0;                       // 对齐到字节
+      const len = src[pos] | (src[pos + 1] << 8);
+      pos += 4;
+      for (let i = 0; i < len; i++) out.push(src[pos++]);
+    } else if (type === 1){
+      const litLen = new Array(288);
+      for (let i = 0; i < 144; i++) litLen[i] = 8;
+      for (let i = 144; i < 256; i++) litLen[i] = 9;
+      for (let i = 256; i < 280; i++) litLen[i] = 7;
+      for (let i = 280; i < 288; i++) litLen[i] = 8;
+      inflateBlock(buildTree(litLen), buildTree(new Array(30).fill(5)));
+    } else if (type === 2){
+      const hlit = get(5) + 257, hdist = get(5) + 1, hclen = get(4) + 4;
+      const order = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+      const clen = new Array(19).fill(0);
+      for (let i = 0; i < hclen; i++) clen[order[i]] = get(3);
+      const ct = buildTree(clen);
+      const lens = [];
+      while (lens.length < hlit + hdist){
+        const sym = decode(ct);
+        if (sym < 16) lens.push(sym);
+        else if (sym === 16){ const r = get(2) + 3, p = lens[lens.length - 1]; for (let i = 0; i < r; i++) lens.push(p); }
+        else if (sym === 17){ const r = get(3) + 3; for (let i = 0; i < r; i++) lens.push(0); }
+        else { const r = get(7) + 11; for (let i = 0; i < r; i++) lens.push(0); }
+      }
+      inflateBlock(buildTree(lens.slice(0, hlit)), buildTree(lens.slice(hlit, hlit + hdist)));
+    } else {
+      throw new Error("压缩块类型错误");
+    }
+  }
+  return new TextDecoder("utf-8").decode(new Uint8Array(out));
+}
 async function unzipEntry(buffer, wanted){
   const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
   let eocd = -1;
@@ -551,8 +657,13 @@ async function unzipEntry(buffer, wanted){
       const start = localOff + 30 + lNameLen + lExtraLen;
       const data  = u8.subarray(start, start + compSz);
       if (method === 0) return new TextDecoder("utf-8").decode(data);
-      const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-      return await new Response(stream).text();
+      if (typeof DecompressionStream === "function"){
+        try{
+          const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+          return await new Response(stream).text();
+        }catch(_){ /* 落到下面的纯 JS 兜底 */ }
+      }
+      return rawInflate(data);      // 老浏览器（无 DecompressionStream）走这里
     }
     off += 46 + nameLen + extraLen + cmtLen;
   }
@@ -607,7 +718,7 @@ const RE_BLOCK_ENV   = /^\s*环节\s*(\d+)\s*(附加)?\s*[：:]?\s*(.+?)\s*[（(
 const RE_BLOCK_CLOCK = /^\s*(\d{1,2})\s*[:：]\s*(\d{2})\s*[—\-–~至‑]+\s*(\d{1,2})\s*[:：]\s*(\d{2})\s*[｜|]?\s*(.*)$/;
 const RE_SPEAKER_BR  = /^\s*[【\[]\s*([^】\]]{1,14})\s*[】\]]\s*(.*)$/;
 const RE_SPEAKER_COL = /^\s*([^\s：:（）()\[\]【】，。！？、]{1,10})\s*(?:[（(][^）)]{0,12}[）)])?\s*[：:]\s*(.+)$/;
-const RE_STOP        = /^\s*(四|五|六|七)、/;
+const RE_STOP        = /^\s*(四|五|六|七)、[^\n]{0,20}(常见|问答|FAQ|faq|问题|答疑|附录|附件|物料|联系|备注|说明|资料|下载|目录)/;
 const SKIP_PFX       = ["环节内容","话术参考","对应KT板","KT板","物料清单","直播基本信息","二、","三、","备注：","说明：","目录"];
 const RE_NOISE       = /^(KT\s*\d|KT板|对应KT板|环节内容|话术参考|物料清单|直播基本信息|备注|说明|目录|附：|附录)/;
 const CIRCLED        = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
