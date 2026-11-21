@@ -448,7 +448,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1328";
+      window.__BUILD = "1121-1339";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -549,6 +549,7 @@
     <label>标题 <input type="text" id="optTitle" placeholder="可留空" /></label>
     <label>每行最多字数 <input type="number" id="optLen" value="52" min="20" max="120" step="2" /></label>
     <label><input type="checkbox" id="optBold" checked /> 数字与关键承诺加粗</label>
+        <label title="把中控动作交给 AI 指派到具体台词（站点需配置 key）"><input type="checkbox" id="optAiCtrl" /> AI 分配中控</label>
   </div>
 
   <div class="bar">
@@ -1228,6 +1229,7 @@ async function generate(lines, titleOverride){
   SS.set("tyc_lines", JSON.stringify(lines));
   SS.set("tyc_title", title);
   currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""));
+  try{ aiAssignCtrl(); }catch(_){}
 }
 
 /* 历史与当前脚本存在「这台电脑的浏览器」里：关标签/重启浏览器都还在；
@@ -1745,6 +1747,52 @@ function stopFollow(){
   renderRead();
 }
 
+/* ---------- AI 分配中控（可选，默认关） ---------- */
+async function aiAssignCtrl(){
+  const on = ($("optAiCtrl") && $("optAiCtrl").checked);
+  if (!on || !BLOCKS.length) return;
+
+  // 只把"规则没完全搞定"的板块交给 AI，省 token
+  const plan = BLOCKS.map((b, bi) => ({ bi, b })).filter(x => (x.b.ctrl || "").length);
+  if (!plan.length) return;
+
+  const payload = {
+    blocks: plan.map(x => ({
+      name: x.b.name,
+      cues: x.b.cues.map(c => c[1]),
+      ctrl: splitCtrlText(x.b.ctrl)
+    }))
+  };
+
+  try{
+    $("stat").innerHTML = "正在用 AI 分配中控…";
+    const r = await fetch("/api/map-ctrl", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if (!data || !data.ok || !Array.isArray(data.blocks)) throw new Error("接口不可用");
+
+    plan.forEach((x, i) => {
+      const res = data.blocks[i];
+      if (!res || !Array.isArray(res.assign)) return;
+      const clauses = splitCtrlText(x.b.ctrl);
+      const mapped = [];
+      res.assign.forEach(a => {
+        const txt = clauses[a.ctrl];
+        if (!txt) return;
+        const cueIdx = (a.cue >= 0 && a.cue < x.b.cues.length) ? a.cue : null;
+        mapped.push({ i: cueIdx, text: txt, score: 200 });
+      });
+      if (mapped.length) x.b.ctrlAt = mapped;
+    });
+
+    render();
+    $("stat").innerHTML = "已按 AI 结果分配中控（" + plan.length + " 个板块）";
+  }catch(e){
+    $("stat").innerHTML = "AI 分配不可用，已用本地规则结果";
+  }
+}
 /* ---------- 本地模型：自检 → 需要时居中询问 → 同意后下载 ---------- */
 const ASR_PREF_KEY = "tyc_asr_pref";        // local | skip | never
 function asrPref(){ try { return localStorage.getItem(ASR_PREF_KEY) || ""; } catch(_){ return ""; } }

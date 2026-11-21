@@ -94,3 +94,11 @@ python -m http.server 8080
 | 浏览器语音识别（默认） | 0.5–1.5s | 0（受网络/区域影响大） |
 | 本地 whisper-tiny | 约 3s（2.5s 分块 + 0.9s 解码） | 0，离线可用 |
 | 云端流式 ASR | 0.2–0.3s | ¥2–3/小时 |
+## AI 分配中控（可选）
+
+规则能处理「提到编号/引号原文/关键词」的动作；抽象动作（如"注意节奏"）交给 DeepSeek 指派到具体台词。
+
+- 代码：`functions/api/map-ctrl.js`（Pages Function）
+- 启用：Pages → Settings → Environment variables → `DEEPSEEK_API_KEY`，重新部署
+- 前端开关：工作台勾选「AI 分配中控」，生成时调用一次；接口不可用自动退回规则结果，不影响使用
+- 安全：key 只在服务端；接口校验同源、限流 20 次/分钟/IP、字段白名单、错误不外泄、响应 no-store
