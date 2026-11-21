@@ -463,7 +463,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1356";
+      window.__BUILD = "1121-1415";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -564,7 +564,7 @@
     <label>标题 <input type="text" id="optTitle" placeholder="可留空" /></label>
     <label>每行最多字数 <input type="number" id="optLen" value="52" min="20" max="120" step="2" /></label>
     <label><input type="checkbox" id="optBold" checked /> 数字与关键承诺加粗</label>
-        <label title="把中控动作交给 AI 指派到具体台词（站点需配置 key）"><input type="checkbox" id="optAiCtrl" /> AI 分配中控</label>
+        <label title="AI 智能整理：没有板块标题时自动分段，并把中控动作指派到具体台词（站点需配置 key）"><input type="checkbox" id="optAiCtrl" /> AI 智能整理</label>
   </div>
 
   <div class="bar">
@@ -1122,6 +1122,7 @@ function renderRead(){
       (bi > 0 ? `<button id="btnMergeUp">⤴ 并入上一块</button>` : "") +
       `<button id="btnRenameBlk">✎ 改名</button>` +
       `<button id="btnBlkMin">⏱ 改时长</button>` +
+      `<button id="btnUndo" ${undoStack.length ? "" : "disabled"} style="margin-left:auto;${undoStack.length ? "" : "opacity:.45;cursor:default"}">↶ 撤回</button>` +
       `</div></li>`;
     const firstSp = c.lines[0].sp;
     const hasBadge = !!(SP[firstSp] && SP[firstSp][0]);
@@ -1459,7 +1460,9 @@ async function handleFile(f){
 }
 
 /* 视图切换：淡出淡入，不硬跳 */
+let pushedPrompter = false;
 function enterPrompter(){
+  if (!pushedPrompter){ try{ history.pushState({ tyc: "prompter" }, ""); pushedPrompter = true; }catch(_){} }
   setTimeout(()=>{ try{ followBuild(); }catch(_){} try{ askLocalAsr(); }catch(_){} }, 60);
   $("setup").classList.add("leaving");
   setTimeout(()=>{
@@ -1469,8 +1472,10 @@ function enterPrompter(){
     requestAnimationFrame(()=> $("prompter").classList.add("shown"));
   }, 230);
 }
-function leavePrompter(){
+function leavePrompter(fromPop){
+  pushedPrompter = false;
   try{ if (FLW.on) stopFollow(); }catch(_){}
+  if (!fromPop){ try{ if (history.state && history.state.tyc === "prompter") history.back(); }catch(_){} }
   $("prompter").classList.remove("shown");
   setTimeout(()=>{
     $("prompter").classList.remove("on");
@@ -1673,6 +1678,29 @@ function followPaint(){
 
 /* ---------- 板块边界编辑：断开 / 合并 / 改名 / 改时长 ---------- */
 const CIRCLED_NUM = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
+const undoStack = [];
+function snapBlocks(){
+  try{ undoStack.push(JSON.stringify({ blocks: BLOCKS, bi })); }catch(_){}
+  if (undoStack.length > 30) undoStack.shift();
+}
+function undoBlockEdit(){
+  if (!undoStack.length) return;
+  try{
+    const snap = JSON.parse(undoStack.pop());
+    BLOCKS = snap.blocks;
+    bi = Math.min(snap.bi || 0, BLOCKS.length - 1);
+    left = BLOCKS[bi].dur;
+    render(); renderNav(); paintClock();
+    try{ followBuild(); }catch(_){}
+    try{ saveNow(true); }catch(_){}
+    followStatus("已撤回上一步", false);
+  }catch(_){}
+}
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "z" && !document.activeElement.isContentEditable){
+    e.preventDefault(); undoBlockEdit();
+  }
+});
 
 function renumberBlocks(){
   BLOCKS.forEach((b, i) => { b.no = CIRCLED_NUM[i] || ("(" + (i+1) + ")"); });
@@ -1695,6 +1723,7 @@ function afterBlockEdit(msg){
 }
 
 function splitBlockAt(bi0, ci){
+  snapBlocks();
   const b = BLOCKS[bi0];
   if (!b || ci <= 0 || ci >= b.cues.length) return;
   const tail = b.cues.slice(ci);
@@ -1714,6 +1743,7 @@ function splitBlockAt(bi0, ci){
 
 function mergeBlockUp(bi0){
   if (bi0 <= 0) return;
+  snapBlocks();
   const prev = BLOCKS[bi0-1], cur = BLOCKS[bi0];
   prev.cues = prev.cues.concat(cur.cues);
   prev.dur = prev.dur + cur.dur;
@@ -1726,6 +1756,7 @@ function mergeBlockUp(bi0){
 
 function renameBlock(bi0){
   const b = BLOCKS[bi0];
+  snapBlocks();
   const v = prompt("板块名称：", b.name);
   if (v == null) return;
   b.name = String(v).trim().slice(0, 16) || b.name;
@@ -1734,6 +1765,7 @@ function renameBlock(bi0){
 
 function editBlockMinutes(bi0){
   const b = BLOCKS[bi0];
+  snapBlocks();
   const v = prompt("这一块多少分钟？", String(Math.round(b.dur/60)));
   if (v == null) return;
   const m = Math.max(1, Math.min(180, parseInt(v, 10) || Math.round(b.dur/60)));
@@ -1754,6 +1786,7 @@ document.addEventListener("click", e => {
   if (e.target.closest && e.target.closest("#btnMergeUp")){ mergeBlockUp(bi); return; }
   if (e.target.closest && e.target.closest("#btnRenameBlk")){ renameBlock(bi); return; }
   if (e.target.closest && e.target.closest("#btnBlkMin")){ editBlockMinutes(bi); return; }
+  if (e.target.closest && e.target.closest("#btnUndo")){ undoBlockEdit(); return; }
 }, true);
 /* ---------- 收起态：hover 显示板块名 ---------- */
 let railTip = null;
@@ -1930,7 +1963,7 @@ async function aiAssignCtrl(){
   };
 
   try{
-    $("stat").innerHTML = "正在用 AI 分配中控…";
+    $("stat").innerHTML = "正在用 AI 智能整理…";
     const r = await fetch("/api/map-ctrl", {
       method:"POST", headers:{ "Content-Type":"application/json" },
       body: JSON.stringify(payload)
@@ -1953,9 +1986,9 @@ async function aiAssignCtrl(){
     });
 
     render();
-    $("stat").innerHTML = "已按 AI 结果分配中控（" + plan.length + " 个板块）";
+    $("stat").innerHTML = "AI 已把中控分配到 " + plan.length + " 个板块";
   }catch(e){
-    $("stat").innerHTML = "AI 分配不可用，已用本地规则结果";
+    $("stat").innerHTML = "AI 整理不可用，已用本地规则结果";
   }
 }
 /* ---------- 本地模型：自检 → 需要时居中询问 → 同意后下载 ---------- */
@@ -2195,6 +2228,12 @@ function startFollow(){
 }
 
 $("btnFollow").onclick = () => { if (FLW.on) stopFollow(); else startFollow(); };
+/* 浏览器返回键：从提词页回到工作台，而不是离开页面 */
+window.addEventListener("popstate", () => {
+  const pv = $("prompter");
+  const open = pv && (pv.classList.contains("on") || getComputedStyle(pv).display !== "none");
+  if (open) leavePrompter(true);
+});
 try{ $("buildTag").textContent = window.__BUILD || ""; }catch(_){}
 /* 侧边栏收起 / 展开 */
 function setRail(collapsed){
