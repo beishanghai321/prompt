@@ -440,6 +440,9 @@
     transform:rotate(45deg);animation:swipeNudge 1.6s ease-in-out infinite;
   }
   @keyframes swipeNudge{0%,100%{transform:translateY(0) rotate(45deg);opacity:.55}50%{transform:translateY(5px) rotate(45deg);opacity:1}}
+  /* 全文视图：顶部只留计时，避免和正文里的板块标题重复 */
+  body.allview .head .ttl{display:none}
+  body.allview .head{justify-content:flex-end}
   /* 全文视图（跟读） */
   .cues li.blkhead{
     list-style:none;margin:22px 0 6px;padding:6px 2px;border-bottom:1px solid var(--line);
@@ -496,7 +499,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1621";
+      window.__BUILD = "1121-1634";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -661,7 +664,8 @@
         <button id="fsUp" title="放大字号（=）">A+</button>
       </div>
       <div class="editbar">
-        <button id="btnView" title="切换全文/分块显示">全文</button>\n        <button id="btnFollow" title="语音跟读：念到哪，高亮跟到哪">🎤 跟读</button>
+        <button id="btnView" title="切换全文/分块显示">全文</button>
+        <button id="btnFollow" title="语音跟读：念到哪，高亮跟到哪">🎤 跟读</button>
         <button id="btnEdit" title="修改台词">编辑</button>
         <button id="btnSave" title="保存到本机">保存</button>
         <span class="savehint" id="saveHint"></span>
@@ -1837,7 +1841,7 @@ let wheelLock = 0;
 let arrivedAt = 0;            // 到达顶部/底部的时刻
 let arrivedEdge = null;       // "bottom" | "top" | null
 $("cues").addEventListener("wheel", e => {
-  if (followView) return;
+  if (followView || allView) return;    // 全文模式不切页
   if (Date.now() < wheelLock){ e.preventDefault(); return; }   // 切块后短暂锁滚动，避免惯性滑过头
   const el = e.currentTarget;
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 6;
@@ -2087,7 +2091,7 @@ function stopFollow(){
   try{ localAsrStop(); }catch(_){}
   if (FLW.rec){ try { FLW.rec.onend = null; FLW.rec.stop(); } catch(_){} FLW.rec = null; }
   $("btnFollow").classList.remove("on");
-  try{ followView = false; clearInterval(fwClockTimer); fwClockTimer = null; render(); paintClock(); }catch(_){}
+  try{ followView = false; document.body.classList.toggle("allview", allView); clearInterval(fwClockTimer); fwClockTimer = null; render(); paintClock(); }catch(_){}
   $("btnFollow").textContent = "🎤 跟读";
   followStatus("");
   renderRead();
@@ -2173,6 +2177,24 @@ async function aiSplitBlocks(lines, parsed){
   }catch(e){
     return false;
   }
+}
+/* 导入后立刻用 AI 起标题（AI 勾选时） */
+async function aiTitleFromLines(lines){
+  if (!($("optAiCtrl") && $("optAiCtrl").checked)) return;
+  if (($("optTitle").value || "").trim()) return;
+  const head = (lines || [])
+    .map(l => String(l).trim())
+    .filter(l => l && !/^(环节\s*\d|中控配合|话术参考|对应KT板|KT板|物料)/.test(l))
+    .slice(0, 18);
+  if (!head.length) return;
+  try{
+    const r = await fetch("/api/title", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ head, hint: (lines[0] || "").slice(0, 60) })
+    });
+    const data = await r.json();
+    if (data && data.ok && data.title) setTitle(data.title, true);
+  }catch(_){}
 }
 /* ---------- AI 分配中控（可选，默认关） ---------- */
 async function aiAssignCtrl(){
@@ -2417,7 +2439,7 @@ function localAsrStop(){
   LASR.ctx = null; LASR.node = null; LASR.buf = []; LASR.bufLen = 0;
 }
 function startFollow(){
-  try{ followView = true; FW_START = Date.now(); if (!FW) followBuild(); render(); paintClock();
+  try{ followView = true; document.body.classList.add("allview"); FW_START = Date.now(); if (!FW) followBuild(); render(); paintClock();
     clearInterval(fwClockTimer); fwClockTimer = setInterval(paintClock, 1000); }catch(_){}
   const useLocal = /[?&]asr=local/.test(location.search) || asrPref() === "local";
   if (useLocal){
@@ -2458,15 +2480,35 @@ function startFollow(){
   FLW.rec = rec;
 }
 
+/* 全文模式：滚动时同步左侧目录 */
+let syncRaf = 0;
+$("cues").addEventListener("scroll", () => {
+  if (!allView || followView) return;
+  if (syncRaf) return;
+  syncRaf = requestAnimationFrame(() => {
+    syncRaf = 0;
+    const box = $("cues");
+    const heads = box.querySelectorAll("li.blkhead");
+    if (!heads.length) return;
+    const top = box.scrollTop + 90;
+    let cur = 0;
+    heads.forEach(h => { if (h.offsetTop <= top) cur = +h.dataset.bi; });
+    if (cur !== bi){
+      bi = cur; left = BLOCKS[bi].dur;
+      paintClock(); renderNav(); syncRailHighlight();
+    }
+  });
+}, { passive: true });
 /* ---------- 视图切换：全文 <-> 分块 ---------- */
 function applyViewLabel(){
   const b = $("btnView");
   if (b) b.textContent = allView ? "全文" : "分块";
+  document.body.classList.toggle("allview", allView || followView);
 }
 function setAllView(v){
   allView = !!v;
   try{ localStorage.setItem("tyc_allview", allView ? "1" : "0"); }catch(_){}
-  applyViewLabel();
+  applyViewLabel(); document.body.classList.toggle("allview", allView || followView);
   render();
   try{ resetScrollTop(); }catch(_){}
 }
@@ -2480,7 +2522,7 @@ $("btnView").onclick = () => {
     setAllView(true);
   }
 };
-applyViewLabel();
+applyViewLabel(); document.body.classList.toggle("allview", allView || followView);
 $("btnFollow").onclick = () => {
   if (FLW.on){ stopFollow(); return; }
   asrModalOpen(true, "fwAsk");
@@ -2522,9 +2564,14 @@ $("btnReselect").onclick = () => {
   $("file").click();
 };
 
+let pasteTitleTimer = 0;
 $("paste").addEventListener("input", () => {
-  if ($("optAiCtrl") && $("optAiCtrl").checked) return;
   const ls = textToLines($("paste").value || "");
+  if ($("optAiCtrl") && $("optAiCtrl").checked){
+    clearTimeout(pasteTitleTimer);
+    pasteTitleTimer = setTimeout(() => aiTitleFromLines(ls), 900);   // AI 起标题（防抖）
+    return;
+  }
   if (ls.length) setTitle(extractTitle(ls) || "", true);
 });
 
@@ -2538,6 +2585,7 @@ $("btnGen").onclick = () => {
   }
   const ls = textToLines(text);
   if (!($("optAiCtrl") && $("optAiCtrl").checked)) setTitle(extractTitle(ls) || "", true);
+  else aiTitleFromLines(ls);
   generate(ls);
 };
 
