@@ -416,6 +416,14 @@
     padding:5px 10px;font-size:12px;cursor:pointer;font-family:var(--font);transition:.15s;
   }
   .blkops button:hover{color:var(--blue);border-color:#c7d9f0}
+  /* 板块切换过渡 */
+  .cues.switching{opacity:0;transform:translateY(10px);transition:opacity .14s ease,transform .14s ease}
+  .cues{transition:opacity .2s ease,transform .2s cubic-bezier(.16,1,.3,1)}
+  ::view-transition-old(root){animation:fadeOut .18s ease both}
+  ::view-transition-new(root){animation:fadeIn .24s cubic-bezier(.16,1,.3,1) both}
+  @keyframes fadeOut{to{opacity:0;transform:translateY(-6px)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){ .cues,.cues.switching{transition:none} }
   /* 全文视图（跟读） */
   .cues li.blkhead{
     list-style:none;margin:22px 0 6px;padding:6px 2px;border-bottom:1px solid var(--line);
@@ -472,7 +480,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1528";
+      window.__BUILD = "1121-1534";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1226,6 +1234,15 @@ function setEditing(on){
 function paintClock(){
   const b = BLOCKS[bi];
   const t = $("clockT"), bar = $("clockBar");
+  if (followView){                                   // 跟读：总计时，从 0 往上走
+    const sec = Math.max(0, Math.floor((Date.now() - (FW_START || Date.now())) / 1000));
+    t.textContent = fmt(sec);
+    t.className = "t";
+    bar.style.width = "100%";
+    $("flash").className = "flash";
+    $("clockHint").textContent = "跟读中 · 全场已用时";
+    return;
+  }
   t.textContent = left >= 0 ? fmt(left) : "-" + fmt(-left);
   const pct = Math.max(0, Math.min(1, left / (b.dur || 1)));
   bar.style.width = (pct*100).toFixed(1) + "%";
@@ -1235,6 +1252,18 @@ function paintClock(){
     : (running ? "计时中 · 到点切板块" : "剩余时间 · 空格开始");
 }
 
+/* ---------- 切板块：丝滑过渡 ---------- */
+function goSmooth(idx){
+  const target = (idx + BLOCKS.length) % BLOCKS.length;
+  if (target === bi){ go(idx); return; }
+  if (document.startViewTransition){
+    document.startViewTransition(() => { go(idx); });
+    return;
+  }
+  const box = $("cues");
+  box.classList.add("switching");
+  setTimeout(() => { go(idx); requestAnimationFrame(() => box.classList.remove("switching")); }, 140);
+}
 function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); if (running) tickStart(); }
 function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ left -= 1; paintClock(); }, 1000); }
 function toggle(){ running = !running; if (running) tickStart(); else clearInterval(timer); paintClock(); }
@@ -1548,6 +1577,8 @@ function loadBlocks(blocks, key){
 /* ================= 语音跟读（字面级定位，不依赖句意理解） ================= */
 const FLW = { on:false, rec:null, ptr:0, cue:-1, char:0, wait:0, pausedUntil:0, transcript:"", lastMoveAt:0, nextAt:0, farK:-1, farN:0 };
 let followView = false;
+let FW_START = 0;
+let fwClockTimer = null;
 let FW = null;
 
 function normText(s){ return String(s).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ""); }
@@ -1686,7 +1717,7 @@ function followPaint(){
   if (followView){
     // 全文视图：只更新侧栏/计时器的当前板块，不重渲染，避免滚动位置丢失
     if (item.bi !== bi){
-      bi = item.bi; left = BLOCKS[bi].dur; paintClock(); renderNav();
+      bi = item.bi; left = BLOCKS[bi].dur; paintClock(); renderNav(); syncRailHighlight();
     }
     FLW.cue = idx;
     const liA = document.querySelector(`#cues li[data-gi="${idx}"]`);
@@ -1753,10 +1784,10 @@ $("cues").addEventListener("wheel", e => {
   const atTop = el.scrollTop <= 4;
   if (e.deltaY > 0 && atBottom){
     wheelLock = Date.now() + 700;
-    if (bi < BLOCKS.length - 1) go(bi + 1);
+    if (bi < BLOCKS.length - 1) goSmooth(bi + 1);
   } else if (e.deltaY < 0 && atTop){
     wheelLock = Date.now() + 700;
-    if (bi > 0) go(bi - 1);
+    if (bi > 0) goSmooth(bi - 1);
   }
 }, { passive: true });
 /* ---------- 板块边界编辑：断开 / 合并 / 改名 / 改时长 ---------- */
@@ -1871,6 +1902,13 @@ document.addEventListener("click", e => {
   if (e.target.closest && e.target.closest("#btnBlkMin")){ editBlockMinutes(bi); return; }
   if (e.target.closest && e.target.closest("#btnUndo")){ undoBlockEdit(); return; }
 }, true);
+/* 侧栏跟随跟读：高亮当前板块并滚动到可见 */
+function syncRailHighlight(){
+  const btn = document.querySelector(`#nav .navbtn[data-i="${bi}"]`);
+  if (!btn) return;
+  btn.classList.add("on");
+  try{ btn.scrollIntoView({ block:"nearest", behavior:"smooth" }); }catch(_){}
+}
 /* ---------- 收起态：hover 显示板块名 ---------- */
 let railTip = null;
 function showRailTip(btn){
@@ -1976,7 +2014,7 @@ function stopFollow(){
   try{ localAsrStop(); }catch(_){}
   if (FLW.rec){ try { FLW.rec.onend = null; FLW.rec.stop(); } catch(_){} FLW.rec = null; }
   $("btnFollow").classList.remove("on");
-  try{ followView = false; render(); }catch(_){}
+  try{ followView = false; clearInterval(fwClockTimer); fwClockTimer = null; render(); paintClock(); }catch(_){}
   $("btnFollow").textContent = "🎤 跟读";
   followStatus("");
   renderRead();
@@ -2100,8 +2138,8 @@ async function hasCachedModel(){
   return false;
 }
 
-function asrModalOpen(open, keepAllowed){
-  const mask = $("asrMask");
+function asrModalOpen(open, maskId){
+  const mask = $(maskId || "asrMask");
   if (!mask) return;
   if (open){
     mask.hidden = false;
@@ -2275,7 +2313,8 @@ function localAsrStop(){
   LASR.ctx = null; LASR.node = null; LASR.buf = []; LASR.bufLen = 0;
 }
 function startFollow(){
-  try{ followView = true; if (!FW) followBuild(); render(); }catch(_){}
+  try{ followView = true; FW_START = Date.now(); if (!FW) followBuild(); render(); paintClock();
+    clearInterval(fwClockTimer); fwClockTimer = setInterval(paintClock, 1000); }catch(_){}
   const useLocal = /[?&]asr=local/.test(location.search) || asrPref() === "local";
   if (useLocal){
     FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
@@ -2315,7 +2354,13 @@ function startFollow(){
   FLW.rec = rec;
 }
 
-$("btnFollow").onclick = () => { if (FLW.on) stopFollow(); else startFollow(); };
+$("btnFollow").onclick = () => {
+  if (FLW.on){ stopFollow(); return; }
+  asrModalOpen(true, "fwAsk");
+  $("fwGo").onclick = () => { asrModalOpen(false, "fwAsk"); setTimeout(startFollow, 180); };
+  $("fwCancel").onclick = () => asrModalOpen(false, "fwAsk");
+};
+
 /* 浏览器返回键：从提词页回到工作台，而不是离开页面 */
 window.addEventListener("popstate", () => {
   const pv = $("prompter");
@@ -2440,6 +2485,17 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
   renderHist();
 })();
 </script>
+    <!-- 跟读确认 -->
+    <div class="asrmask" id="fwAsk" hidden>
+      <div class="asrmodal" style="width:min(420px,calc(100vw - 40px))">
+        <div class="asrhead"><b>进入跟读模式</b><span>麦克风</span></div>
+        <p class="asrdesc">跟读会把整份脚本合并成<b>连续一页</b>，高亮跟着你的声音往下走；计时切换为<b>全场总用时</b>（从 0 开始）。中途随时可以退出，回到分块手动模式。</p>
+        <div class="asrask-b">
+          <button class="primary" id="fwGo">开始跟读</button>
+          <button id="fwCancel">取消</button>
+        </div>
+      </div>
+    </div>
     <!-- 本地模型询问（居中模态） -->
     <div class="asrmask" id="asrMask" hidden>
       <div class="asrmodal" id="asrModal" role="dialog" aria-modal="true">
