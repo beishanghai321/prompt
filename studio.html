@@ -424,6 +424,27 @@
 </style>
 </head>
 <body>
+    <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
+    <script>
+      window.__BUILD = "ab2020a";
+      (function(){
+        function show(msg){
+          var b = document.getElementById("errBar");
+          if (!b) return;
+          b.style.display = "block";
+          b.textContent = "页面脚本出错（版本 " + window.__BUILD + "）：" + msg + "　—　截图发我即可定位";
+        }
+        window.addEventListener("error", function(e){ show(e.message + " @" + (e.filename||"").split("/").pop() + ":" + e.lineno); });
+        window.addEventListener("unhandledrejection", function(e){ show("Promise: " + (e.reason && e.reason.message || e.reason)); });
+
+        // 老浏览器（Edge 18 / Safari 12 等）连脚本都解析不了，先给出明确提示
+        try { eval("var __o={};__o&&__o.a?.b;__o.a??1;"); }
+        catch(err){ show("浏览器版本过低（不支持可选链 ?. / ??），请用 Chrome 或新版 Edge 打开"); }
+        if (typeof window.fetch !== "function" || typeof window.Worker !== "function") {
+          show("浏览器缺少必要能力（fetch / Worker），请换 Chrome 或新版 Edge");
+        }
+      })();
+    </script>
 
 <!-- ================= 导入 ================= -->
 <section id="setup">
@@ -1606,7 +1627,7 @@ async function hasCachedModel(){
   return false;
 }
 
-function asrModalOpen(open){
+function asrModalOpen(open, keepAllowed){
   const mask = $("asrMask");
   if (!mask) return;
   if (open){
@@ -1617,6 +1638,9 @@ function asrModalOpen(open){
     setTimeout(()=>{ mask.hidden = true; }, 280);
   }
 }
+/* 逃生通道：Esc 或点遮罩外即关闭 */
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("asrMask").hidden) asrModalOpen(false); });
+document.addEventListener("click", e => { if (e.target && e.target.id === "asrMask") asrModalOpen(false); }, true);
 function asrStepShow(n){
   $("asrStep1").hidden = n !== 1;
   $("asrStep2").hidden = n !== 2;
