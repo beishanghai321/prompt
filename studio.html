@@ -424,6 +424,10 @@
   @keyframes slideOutLeft{to{opacity:.15;transform:translateX(-26px)}}
   @keyframes slideInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){ .cues,.cues.switching{transition:none} }
+  /* 内容区切换过渡（只动正文，不动整页） */
+  .cues.slidein{animation:cuesSlideIn .32s cubic-bezier(.16,1,.3,1) both}
+  @keyframes cuesSlideIn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){ .cues.slidein{animation:none} }
   /* 底部滑动提示 */
   .cues li.swipehint{
     list-style:none;margin:18px 0 8px;padding:10px 0;text-align:center;color:var(--ink-3);
@@ -490,7 +494,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1547";
+      window.__BUILD = "1121-1553";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1111,6 +1115,7 @@ function renderNav(){
 }
 
 let editing = false, currentKey = null, saveTimer = null;
+let titleAutoFilled = false;
 
 function render(){
   const b = BLOCKS[bi];
@@ -1284,14 +1289,24 @@ function resetScrollTop(){
 function goSmooth(idx){
   const target = (idx + BLOCKS.length) % BLOCKS.length;
   if (target === bi){ go(idx); return; }
-  if (document.startViewTransition){
-    document.startViewTransition(() => { go(idx); });
-    setTimeout(resetScrollTop, 60);
-    return;
-  }
+  // 只给内容区做过渡，不整页动（整页动容易晕）
+  const boxEl = $("cues");
+  boxEl.classList.add("switching");
+  setTimeout(() => {
+    go(idx);
+    boxEl.classList.remove("switching");
+    boxEl.classList.add("slidein");
+    requestAnimationFrame(() => setTimeout(() => boxEl.classList.remove("slidein"), 340));
+  }, 120);
+  return;
   const box = $("cues");
   box.classList.add("switching");
-  setTimeout(() => { go(idx); resetScrollTop(); requestAnimationFrame(() => box.classList.remove("switching")); }, 140);
+  setTimeout(() => {
+    go(idx);
+    box.classList.remove("switching");
+    box.classList.add("slidein");
+    requestAnimationFrame(() => setTimeout(() => box.classList.remove("slidein"), 340));
+  }, 120);
 }
 function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); resetScrollTop(); if (running) tickStart(); }
 function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ left -= 1; paintClock(); }, 1000); }
@@ -1535,7 +1550,7 @@ async function handleFile(f){
     const wait = Math.max(0, 620 - (performance.now() - t0));   // 让动画看得见，但不拖沓
     await delay(wait);
     const title = extractTitle(lines) || f.name.replace(/\.[^.]+$/,"").trim();
-    $("optTitle").value = title;
+    $("optTitle").value = title; titleAutoFilled = !!title;
     pending = { lines, title };
     showDone(f.name, parsed);
   } catch (err){
@@ -1810,6 +1825,7 @@ let arrivedAt = 0;            // 到达顶部/底部的时刻
 let arrivedEdge = null;       // "bottom" | "top" | null
 $("cues").addEventListener("wheel", e => {
   if (followView) return;
+  if (Date.now() < wheelLock){ e.preventDefault(); return; }   // 切块后短暂锁滚动，避免惯性滑过头
   const el = e.currentTarget;
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 6;
   const atTop = el.scrollTop <= 4;
@@ -1829,7 +1845,7 @@ $("cues").addEventListener("wheel", e => {
     arrivedEdge = null; arrivedAt = 0;
     goSmooth(bi - 1);
   }
-}, { passive: true });
+}, { passive: false });
 /* ---------- 板块边界编辑：断开 / 合并 / 改名 / 改时长 ---------- */
 const CIRCLED_NUM = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
 const undoStack = [];
@@ -2064,7 +2080,7 @@ function stopFollow(){
 async function aiMakeTitle(){
   if (!($("optAiCtrl") && $("optAiCtrl").checked)) return;
   const manual = ($("optTitle").value || "").trim();
-  if (manual) return;                                    // 用户自己填了就不动
+  if (manual && !titleAutoFilled) return;                // 只有用户手填才不覆盖
 
   const head = [];
   BLOCKS.forEach(b => b.cues.forEach(c => { if (head.length < 18) head.push(c[1]); }));
@@ -2079,7 +2095,7 @@ async function aiMakeTitle(){
     const data = await r.json();
     if (!data || !data.ok || !data.title) return;
     const t = data.title;
-    $("optTitle").value = t;
+    $("optTitle").value = t; titleAutoFilled = true;
     document.title = t + " · 提词";
     $("brand").innerHTML = `<b>${esc(t)}</b>`;
     // 同步到历史记录标题
