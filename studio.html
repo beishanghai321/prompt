@@ -499,7 +499,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1641";
+      window.__BUILD = "1121-1648";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1115,7 +1115,20 @@ function renderNav(){
        <span class="no">${b.no}</span>
        <span class="nvtxt"><span class="nm">${b.name}</span><span class="tm">${b.win}</span></span>
      </button>`).join("");
-  $("nav").querySelectorAll(".navbtn").forEach(el => el.onclick = () => go(+el.dataset.i));
+  $("nav").querySelectorAll(".navbtn").forEach(el => el.onclick = () => {
+    const i = +el.dataset.i;
+    if (allView || followView){
+      bi = i; left = BLOCKS[i].dur; paintClock(); renderNav(); syncRailHighlight();
+      const head = document.querySelector(`#cues li.blkhead[data-bi="${i}"]`);
+      const box = $("cues");
+      if (head && box){
+        const top = box.scrollTop + head.getBoundingClientRect().top - box.getBoundingClientRect().top - 6;
+        try{ box.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); }catch(_){ box.scrollTop = Math.max(0, top); }
+      }
+      return;
+    }
+    go(i);
+  });
   $("legendSpeakers").innerHTML = (SP.__order || []).map(k =>
     `<div class="lg"><span class="dot" style="background:${SP[k][2]}"></span>${SP[k][0]}</div>`).join("");
 }
@@ -1579,10 +1592,21 @@ async function handleFile(f){
 /* 视图切换：淡出淡入，不硬跳 */
 let pushedPrompter = false;
 function enterPrompter(){
+  // 每次进入都重置：第一块、全文视图、滚动到顶
+  try{
+    allView = true;
+    try{ localStorage.setItem("tyc_allview", "1"); }catch(_){}
+    document.body.classList.add("allview");
+    const vb = $("btnView"); if (vb) vb.textContent = "全文";
+    bi = 0; left = (BLOCKS[0] ? BLOCKS[0].dur : left);
+    resetScrollTop();
+  }catch(_){}
   if (!pushedPrompter){ try{ history.pushState({ tyc: "prompter" }, ""); pushedPrompter = true; }catch(_){} }
-  setTimeout(()=>{ try{ followBuild(); }catch(_){} try{ askLocalAsr(); }catch(_){} }, 60);
+  setTimeout(()=>{
+    try{ resetScrollTop(); }catch(_){} try{ followBuild(); }catch(_){} try{ askLocalAsr(); }catch(_){} }, 60);
   $("setup").classList.add("leaving");
   setTimeout(()=>{
+    try{ resetScrollTop(); }catch(_){}
     $("setup").style.display = "none";
     $("setup").classList.remove("leaving");
     $("prompter").classList.add("on");
@@ -1595,6 +1619,7 @@ function leavePrompter(fromPop){
   if (!fromPop){ try{ if (history.state && history.state.tyc === "prompter") history.back(); }catch(_){} }
   $("prompter").classList.remove("shown");
   setTimeout(()=>{
+    try{ resetScrollTop(); }catch(_){}
     $("prompter").classList.remove("on");
     $("setup").style.display = "flex";
     $("importCard").classList.remove("busy","ready");
@@ -1830,7 +1855,8 @@ function followPaint(){
       const first = FW.list.findIndex(x => x.bi === nextBi && x.ci === 0);
       go(nextBi);
       if (first >= 0){ FLW.ptr = FW.list[first].start; FLW.cue = -1; }
-      setTimeout(()=>{ try{ followPaint(); }catch(_){} }, 120);
+      setTimeout(()=>{
+    try{ resetScrollTop(); }catch(_){} try{ followPaint(); }catch(_){} }, 120);
     }
   } else {
     FLW.nextAt = 0;
@@ -2308,7 +2334,8 @@ function asrModalOpen(open, maskId){
     requestAnimationFrame(()=> mask.classList.add("on"));
   } else {
     mask.classList.remove("on");
-    setTimeout(()=>{ mask.hidden = true; }, 280);
+    setTimeout(()=>{
+    try{ resetScrollTop(); }catch(_){} mask.hidden = true; }, 280);
   }
 }
 /* 逃生通道：Esc 或点遮罩外即关闭 */
@@ -2526,9 +2553,12 @@ $("cues").addEventListener("scroll", () => {
     const box = $("cues");
     const heads = box.querySelectorAll("li.blkhead");
     if (!heads.length) return;
-    const top = box.scrollTop + 90;
+    const boxTop = box.getBoundingClientRect().top;
     let cur = 0;
-    heads.forEach(h => { if (h.offsetTop <= top) cur = +h.dataset.bi; });
+    heads.forEach(h => {
+      const y = h.getBoundingClientRect().top - boxTop;   // 相对滚动容器
+      if (y <= 90) cur = +h.dataset.bi;
+    });
     if (cur !== bi){
       bi = cur; left = BLOCKS[bi].dur;
       paintClock(); renderNav(); syncRailHighlight();
