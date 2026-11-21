@@ -463,7 +463,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1415";
+      window.__BUILD = "1121-1522";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -564,7 +564,7 @@
     <label>标题 <input type="text" id="optTitle" placeholder="可留空" /></label>
     <label>每行最多字数 <input type="number" id="optLen" value="52" min="20" max="120" step="2" /></label>
     <label><input type="checkbox" id="optBold" checked /> 数字与关键承诺加粗</label>
-        <label title="AI 智能整理：没有板块标题时自动分段，并把中控动作指派到具体台词（站点需配置 key）"><input type="checkbox" id="optAiCtrl" /> AI 智能整理</label>
+        <label title="AI 智能整理：没有板块标题时自动分段，并把中控动作指派到具体台词（站点需配置 key）"><input type="checkbox" id="optAiCtrl" checked /> AI 智能整理</label>
   </div>
 
   <div class="bar">
@@ -1029,7 +1029,7 @@ function parseScript(lines){
     if (nb){
       let first = nb.cues[0].t;
       if (first.length > 46) first = first.slice(0,46) + "…";
-      next = `本块最后一句说完，就接下一块：${first}（${nb.win} 开始【${nb.name}】）`;
+      next = `下一块【${nb.name}】${nb.win}：${first}`;
     } else {
       next = "时间到归零，回到 ① 重新开始下一轮。";
     }
@@ -1617,6 +1617,13 @@ function followLocate(text){
   }
   if (bestK < 0) return { pos: FLW.ptr, conf: 0 };
 
+  // 远距离（跨句/跨段）需要连续两帧指向同一位置才接受，避免一句话听岔就乱跳
+  if (Math.abs(bestK - FLW.ptr) > 25){
+    if (FLW.farK === bestK) FLW.farN = (FLW.farN || 0) + 1;
+    else { FLW.farK = bestK; FLW.farN = 1; followStatus("正在确认位置…", false); }
+    if (FLW.farN < 2) return { pos: FLW.ptr, conf: best };
+  } else { FLW.farK = -1; FLW.farN = 0; }
+
   let pos = Math.min(FW.stream.length - 1, bestK + tail.length);
   const hitIdx = FW.owner[Math.min(bestK, FW.owner.length - 1)];
   const item = FW.list[hitIdx];
@@ -1657,10 +1664,13 @@ function followPaint(){
   li.classList.add("fw");
   li.innerHTML = `<div class="line">${badge}<span class="say"><span class="fc-done">${esc(raw.slice(0,cut))}</span><span class="fc-now">${esc(raw.slice(cut,cut+1))}</span><span class="fc-rest">${esc(raw.slice(cut+1))}</span></span></div>`;
   FLW.char = done;
+  if (!FLW.lastMoveAt) FLW.lastMoveAt = Date.now();
 
   // 段末自动进入下一板块：本句是板块最后一句，且已念到 92% 以上
   const lastCue = (item.ci === BLOCKS[item.bi].cues.length - 1);
-  const finished = item.len > 0 && (FLW.ptr - item.start) >= item.len * 0.82;
+  const prog = item.len > 0 ? (FLW.ptr - item.start) / item.len : 0;
+  const quiet = Date.now() - (FLW.lastMoveAt || 0) > 2600;
+  const finished = prog >= 0.6 || (prog >= 0.25 && quiet);
   if (lastCue && finished && item.bi < BLOCKS.length - 1){
     if (!FLW.nextAt) FLW.nextAt = Date.now() + 900;
     else if (Date.now() >= FLW.nextAt){
@@ -1707,7 +1717,7 @@ function renumberBlocks(){
   BLOCKS.forEach((b, i) => {
     const nb = BLOCKS[i+1];
     b.next = nb
-      ? "本块最后一句说完，就接下一块：" + nb.cues[0][1].slice(0,46) + "（【" + nb.name + "】开始）"
+      ? "下一块【" + nb.name + "】" + (nb.win || "") + "：" + nb.cues[0][1].slice(0,46)
       : "时间到归零，回到 ① 重新开始下一轮。";
   });
 }
@@ -1901,7 +1911,10 @@ function stopFollow(){
 /* ---------- AI 智能分段：脚本没有板块标题时，请 AI 按内容切段 ---------- */
 async function aiSplitBlocks(lines, parsed){
   if (!($("optAiCtrl") && $("optAiCtrl").checked)) return false;
-  if (BLOCKS.length > 1) return false;                 // 已经有板块标题，不用动
+  if (BLOCKS.length > 1){
+    $("stat").innerHTML = "脚本已有板块标题，AI 只整理中控";
+    return false;                                         // 已经有板块标题，不用动
+  }
 
   const cues = BLOCKS[0].cues.map(c => ({ sp: c[0], t: c[1] }));
   if (cues.length < 6) return false;
@@ -2142,7 +2155,7 @@ function localAsrInit(done, opts){
       if (!d.text) return;
       FLW.transcript = (FLW.transcript + d.text).slice(-400);
       const r = followLocate(FLW.transcript);
-      if (r.conf >= 0.45){ FLW.ptr = r.pos; followPaint(); followStatus("本地跟读 · 置信 " + Math.round(r.conf*100) + "%"); }
+      if (r.conf >= 0.45){ FLW.ptr = r.pos; FLW.lastMoveAt = Date.now(); FLW.nextAt = 0; followPaint(); followStatus("本地跟读 · 置信 " + Math.round(r.conf*100) + "%"); }
       else { followStatus("待命 · 本地识别没对上", true); }
       followStatus("本地识别 " + Math.round(d.ms) + "ms / " + LASR.chunkSec + "s 音频", false);
     }
@@ -2212,7 +2225,7 @@ function startFollow(){
     for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
     FLW.transcript = txt;
     const r = followLocate(txt);
-    if (r.conf >= 0.45){ FLW.ptr = r.pos; followPaint(); followStatus("跟读中 · 置信 " + Math.round(r.conf * 100) + "%"); }
+    if (r.conf >= 0.45){ FLW.ptr = r.pos; FLW.lastMoveAt = Date.now(); FLW.nextAt = 0; followPaint(); followStatus("跟读中 · 置信 " + Math.round(r.conf * 100) + "%"); }
     else {
       followStatus("待命 · 没对上脚本（脱稿或识音不准）", true);
       fwAskAI(txt);                                  // 交给 DeepSeek 重排，异步
