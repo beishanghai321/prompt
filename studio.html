@@ -241,6 +241,8 @@
     color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;font-size:13.5px;font-weight:600;letter-spacing:-.01em;line-height:1.35;
   }
+  #nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+  #nav::-webkit-scrollbar{width:0;height:0}
   .navbtn{
     display:flex;gap:8px;align-items:baseline;padding:9px 12px;margin:2px 8px;border-radius:10px;
     cursor:pointer;border:1px solid transparent;background:transparent;color:var(--ink-2);
@@ -494,7 +496,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1553";
+      window.__BUILD = "1121-1606";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -659,7 +661,7 @@
         <button id="fsUp" title="放大字号（=）">A+</button>
       </div>
       <div class="editbar">
-        <button id="btnFollow" title="语音跟读：念到哪，高亮跟到哪">🎤 跟读</button>
+        <button id="btnView" title="切换全文/分块显示">全文</button>\n        <button id="btnFollow" title="语音跟读：念到哪，高亮跟到哪">🎤 跟读</button>
         <button id="btnEdit" title="修改台词">编辑</button>
         <button id="btnSave" title="保存到本机">保存</button>
         <span class="savehint" id="saveHint"></span>
@@ -1116,6 +1118,7 @@ function renderNav(){
 
 let editing = false, currentKey = null, saveTimer = null;
 let titleAutoFilled = false;
+function setTitle(v, auto){ $("optTitle").value = v || ""; titleAutoFilled = !!auto; }
 
 function render(){
   const b = BLOCKS[bi];
@@ -1123,7 +1126,7 @@ function render(){
   $("hName").textContent = b.name;
   $("hWin").textContent = b.win;
 
-  if (editing) renderEdit(); else if (followView) renderAll(); else renderRead();
+  if (editing) renderEdit(); else if (followView || allView) renderAll(); else renderRead();
 
   $("cues").scrollTop = editing ? $("cues").scrollTop : 0;
   renderNav();
@@ -1453,7 +1456,7 @@ function renderHist(){
       if (e.target.classList.contains("del")) return;
       const fresh = getHist().find(x => x.id === el.dataset.id) || rec;   // 取最新的，避免用到渲染时的旧快照
       if (!fresh) return;
-      $("optTitle").value = rec.title || "";
+      setTitle(rec.title || "", false);
       $("optLen").value = rec.len || 52;
       $("optBold").checked = rec.bold !== false;
       if (fresh.blocks && fresh.blocks.length){ loadBlocks(fresh.blocks, fresh.id); }
@@ -1550,7 +1553,7 @@ async function handleFile(f){
     const wait = Math.max(0, 620 - (performance.now() - t0));   // 让动画看得见，但不拖沓
     await delay(wait);
     const title = extractTitle(lines) || f.name.replace(/\.[^.]+$/,"").trim();
-    $("optTitle").value = title; titleAutoFilled = !!title;
+    setTitle(title, true);
     pending = { lines, title };
     showDone(f.name, parsed);
   } catch (err){
@@ -1622,6 +1625,7 @@ function loadBlocks(blocks, key){
 /* ================= 语音跟读（字面级定位，不依赖句意理解） ================= */
 const FLW = { on:false, rec:null, ptr:0, cue:-1, char:0, wait:0, pausedUntil:0, transcript:"", lastMoveAt:0, nextAt:0, farK:-1, farN:0 };
 let followView = false;
+let allView = (localStorage.getItem("tyc_allview") !== "0");
 let FW_START = 0;
 let fwClockTimer = null;
 let FW = null;
@@ -1963,7 +1967,11 @@ function syncRailHighlight(){
   const btn = document.querySelector(`#nav .navbtn[data-i="${bi}"]`);
   if (!btn) return;
   btn.classList.add("on");
-  try{ btn.scrollIntoView({ block:"nearest", behavior:"smooth" }); }catch(_){}
+  const nav = $("nav");
+  if (nav && nav.scrollHeight > nav.clientHeight + 4){
+    const t = btn.offsetTop - nav.clientHeight / 2 + btn.offsetHeight / 2;
+    try{ nav.scrollTo({ top: Math.max(0, t), behavior: "smooth" }); }catch(_){ nav.scrollTop = Math.max(0, t); }
+  }
 }
 /* ---------- 收起态：hover 显示板块名 ---------- */
 let railTip = null;
@@ -2095,7 +2103,7 @@ async function aiMakeTitle(){
     const data = await r.json();
     if (!data || !data.ok || !data.title) return;
     const t = data.title;
-    $("optTitle").value = t; titleAutoFilled = true;
+    setTitle(t, true);
     document.title = t + " · 提词";
     $("brand").innerHTML = `<b>${esc(t)}</b>`;
     // 同步到历史记录标题
@@ -2441,6 +2449,29 @@ function startFollow(){
   FLW.rec = rec;
 }
 
+/* ---------- 视图切换：全文 <-> 分块 ---------- */
+function applyViewLabel(){
+  const b = $("btnView");
+  if (b) b.textContent = allView ? "全文" : "分块";
+}
+function setAllView(v){
+  allView = !!v;
+  try{ localStorage.setItem("tyc_allview", allView ? "1" : "0"); }catch(_){}
+  applyViewLabel();
+  render();
+  try{ resetScrollTop(); }catch(_){}
+}
+$("btnView").onclick = () => {
+  if (allView){
+    // 切到分块：先确认
+    asrModalOpen(true, "viewAsk");
+    $("viewGo").onclick = () => { asrModalOpen(false, "viewAsk"); setTimeout(() => setAllView(false), 160); };
+    $("viewCancel").onclick = () => asrModalOpen(false, "viewAsk");
+  } else {
+    setAllView(true);
+  }
+};
+applyViewLabel();
 $("btnFollow").onclick = () => {
   if (FLW.on){ stopFollow(); return; }
   asrModalOpen(true, "fwAsk");
@@ -2491,7 +2522,7 @@ $("btnGen").onclick = () => {
     return;
   }
   const ls = textToLines(text);
-  if (!$("optTitle").value.trim()) $("optTitle").value = extractTitle(ls) || "";
+  if (!$("optTitle").value.trim()) setTitle(extractTitle(ls) || "", true);
   generate(ls);
 };
 
@@ -2572,6 +2603,18 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
   renderHist();
 })();
 </script>
+    <!-- 视图切换确认 -->
+    <div class="asrmask" id="viewAsk" hidden>
+      <div class="asrmodal" style="width:min(400px,calc(100vw - 40px))">
+        <div class="asrhead"><b>切换为分块显示</b><span>一屏一块</span></div>
+        <p class="asrdesc">分块模式每次只显示一个板块，滚到底继续下滑可进入下一块；适合按节奏切段。随时可以切回全文。</p>
+        <div class="asrask-b">
+          <button class="primary" id="viewGo">确认切换</button>
+          <button id="viewCancel">取消</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 跟读确认 -->
     <div class="asrmask" id="fwAsk" hidden>
       <div class="asrmodal" style="width:min(420px,calc(100vw - 40px))">
