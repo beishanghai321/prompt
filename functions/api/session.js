@@ -13,12 +13,13 @@ const GUEST_COOKIE_TTL = 60 * 60 * 24 * 30;
 
 export async function onRequestGet({ request, env }) {
   const data = await currentSession(request, env);
-  if (!data) return json({ ok: true, authed: false, role: null, aiLeft: 0 });
+  if (!data) return json({ ok: true, authed: false, role: null, aiLeft: 0, kv: !!(env && env.GUEST_KV) });
   return json({
     ok: true,
     authed: true,
     role: data.role || "owner",
-    aiLeft: (data.role === "guest") ? ((data.aiUsed || await kvUsed(env, request, data)) ? 0 : 1) : 999
+    aiLeft: (data.role === "guest") ? ((data.aiUsed || await kvUsed(env, request, data)) ? 0 : 1) : 999,
+    kv: !!(env && env.GUEST_KV)
   });
 }
 

@@ -11,7 +11,7 @@ import { sign, secretOf, json, sameOrigin, readCookie, verifyToken } from "./log
 const TTL = 60 * 60 * 24 * 30;   // 30 天
 
 export async function onRequestGet({ env }) {
-  return json({ ok: true, endpoint: "/api/guest", open: !!(env && env.ARVEA_PASS) });
+  return json({ ok: true, endpoint: "/api/guest", open: !!(env && env.ARVEA_PASS), kv: !!(env && env.GUEST_KV) });
 }
 
 export async function onRequestPost({ request, env }) {
