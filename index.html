@@ -445,7 +445,7 @@ function go(url){
   document.body.classList.add("leaving");
   setTimeout(()=> location.href = url, 240);
 }
-document.getElementById("goWork").onclick = () => go("studio.html?from=home");
+/* 去工作台由登录闸门接管（见文件末尾），这里不再直接跳转 */
 document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
   a.addEventListener("click", e => {
     e.preventDefault();
@@ -463,11 +463,12 @@ document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
   const goBtn= document.getElementById("loginGo");
   const user = document.getElementById("loginUser");
   const pass = document.getElementById("loginPass");
-  const NEXT = "studio.html";
+  const NEXT = "studio.html?from=home";
   let pendingTarget = NEXT;
 
   // 本地预览（file:// 或 127.0.0.1）没有 Cloudflare Functions，直接放行，方便自测
-  const isDev = location.protocol === "file:" || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname);
+  const forceProd = /[?&]prod=1/.test(location.search);   // 调试用：强制按生产环境走闸门
+  const isDev = !forceProd && (location.protocol === "file:" || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname));
 
   async function hasSession(){
     if (isDev) return true;
@@ -490,16 +491,19 @@ document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
     mask.setAttribute("aria-hidden","true");
   }
 
-  async function gate(e, href){
+  function gate(e, href){
     if (isDev) return;                 // 开发环境不拦
-    e.preventDefault();
     pendingTarget = href || NEXT;
-    if (await hasSession()){ location.href = pendingTarget; return; }
+    // 本次会话已登录过 → 直接放行，不再等待任何请求（也就不会闪工作台）
+    let ok = false;
+    try { ok = sessionStorage.getItem("tyc_auth") === "1"; } catch(_){}
+    if (ok) return;
+    e.preventDefault();                // 未登录：先拦住，再弹窗
     openLogin();
   }
 
   document.addEventListener("click", e => {
-    const a = e.target.closest && e.target.closest('a[href$="studio.html"]');
+    const a = e.target.closest && e.target.closest('a[href$="studio.html"], a[href$="studio.html"], a[data-gate]');
     if (a) gate(e, a.getAttribute("href"));
   });
   const goWork = document.getElementById("goWork");
@@ -517,6 +521,7 @@ document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d && d.ok){
+        try { sessionStorage.setItem("tyc_auth","1"); } catch(_){}
         goBtn.textContent = "已登录，正在进入…";
         closeLogin();
         setTimeout(() => { location.href = pendingTarget; }, 220);

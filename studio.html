@@ -6,6 +6,8 @@
 <title>直播提词 · 工作台</title>
 <link rel="icon" href="assets/logo-mark.svg" />
 <style>
+html.auth-pending body{visibility:hidden !important}
+html.auth-pending{background:#fff}
 @font-face{font-family:"Arvea Text";font-style:normal;font-weight:400;font-display:swap;src:url("assets/fonts/SFProPingFangSC-Regular.woff2") format("woff2")}
 @font-face{font-family:"Arvea Text";font-style:normal;font-weight:600 900;font-display:swap;src:url("assets/fonts/SFProPingFangSC-Semibold.woff2") format("woff2")}
 @font-face{font-family:"Arvea Full";font-style:normal;font-weight:400;font-display:swap;src:url("assets/fonts/PingFangSC-Regular.woff2") format("woff2")}
@@ -497,22 +499,29 @@
   .flash.on{display:block;animation:soft 1.6s ease-in-out infinite}
   @keyframes soft{50%{opacity:.35}}
 </style>
-<script>
-/* ---------- 会话守卫：未登录不许进工作台 ---------- */
+<<script>
+/* ---------- 会话守卫：先藏住页面，验证通过才显示 ---------- */
 (function(){
-  const isDev = location.protocol === "file:" || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname);
-  if (isDev) return;                        // 本地预览放行
-  if ((document.body && document.body.dataset.authed) === "1") return;
-  fetch("/api/session", { cache: "no-store" })
-    .then(r => r.ok ? r.json() : { authed: false })
-    .then(d => { if (!d || !d.authed) location.replace("index.html?needLogin=1"); })
-    .catch(() => location.replace("index.html?needLogin=1"));
+  var forceProd = /[?&]prod=1/.test(location.search);     // 调试用：强制按生产环境走
+  var isDev = !forceProd && (location.protocol === "file:" || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname));
+  if (isDev) return;
+  document.documentElement.classList.add("auth-pending");
+  var go = function(ok){
+    if (ok) document.documentElement.classList.remove("auth-pending");
+    else location.replace("index.html?needLogin=1");
+  };
+  try{
+    fetch("/api/session", { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.json() : { authed:false }; })
+      .then(function(d){ go(!!(d && d.authed)); })
+      .catch(function(){ go(false); });
+  }catch(_){ go(false); }
 })();
 </script></head>
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1733";
+      window.__BUILD = "1121-1738";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
