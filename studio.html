@@ -499,7 +499,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1639";
+      window.__BUILD = "1121-1641";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -2140,13 +2140,21 @@ async function aiSplitBlocks(lines, parsed){
   const cues = BLOCKS[0].cues.map(c => ({ sp: c[0], t: c[1] }));
   if (cues.length < 6) return false;
 
+  const sk = hashLines(lines) + "|split";
+
+  let data = aiCacheGet("split", sk);
+  if (!data){
+    try{
+      $("stat").innerHTML = "正在用 AI 规划板块…";
+      const r = await fetch("/api/split", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ totalMinutes: 45, cues })
+      });
+      data = await r.json();
+      if (data && data.ok && Array.isArray(data.blocks) && data.blocks.length >= 2) aiCacheSet("split", sk, data);
+    }catch(e){ return false; }
+  }
   try{
-    $("stat").innerHTML = "正在用 AI 规划板块…";
-    const r = await fetch("/api/split", {
-      method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ totalMinutes: 45, cues })
-    });
-    const data = await r.json();
     if (!data || !data.ok || !Array.isArray(data.blocks) || data.blocks.length < 2) return false;
 
     const CIRCLED = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
@@ -2159,7 +2167,6 @@ async function aiSplitBlocks(lines, parsed){
       ctrl: "",
       ctrlAt: []
     })).filter(b => b.cues.length);
-
     if (rebuilt.length < 2) return false;
     // 重新计算"切下一板块"提示
     rebuilt.forEach((b, i) => {
@@ -2179,6 +2186,22 @@ async function aiSplitBlocks(lines, parsed){
     return false;
   }
 }
+/* ---------- AI 结果缓存：同一份脚本永远得到同样的标题/分段 ---------- */
+function aiCacheGet(kind, key){
+  try{
+    const box = JSON.parse(localStorage.getItem("tyc_ai_cache") || "{}");
+    return box[kind + ":" + key] || null;
+  }catch(_){ return null; }
+}
+function aiCacheSet(kind, key, val){
+  try{
+    const box = JSON.parse(localStorage.getItem("tyc_ai_cache") || "{}");
+    box[kind + ":" + key] = val;
+    const keys = Object.keys(box);
+    if (keys.length > 80) delete box[keys[0]];
+    localStorage.setItem("tyc_ai_cache", JSON.stringify(box));
+  }catch(_){}
+}
 /* 导入后立刻用 AI 起标题（AI 勾选时） */
 async function aiTitleFromLines(lines){
   if (!($("optAiCtrl") && $("optAiCtrl").checked)) return;
@@ -2188,6 +2211,14 @@ async function aiTitleFromLines(lines){
     .filter(l => l && !/^(环节\s*\d|中控配合|话术参考|对应KT板|KT板|物料)/.test(l))
     .slice(0, 18);
   if (!head.length) return;
+
+  const ck = hashLines(lines);
+  const cached = aiCacheGet("title", ck);
+  if (cached){
+    setTitle(cached, true);
+    try{ if (pending) pending.title = cached; }catch(_){}
+    return;
+  }
   try{
     const r = await fetch("/api/title", {
       method:"POST", headers:{ "Content-Type":"application/json" },
@@ -2195,6 +2226,7 @@ async function aiTitleFromLines(lines){
     });
     const data = await r.json();
     if (data && data.ok && data.title){
+      aiCacheSet("title", ck, data.title);
       setTitle(data.title, true);
       try{ if (pending) pending.title = data.title; }catch(_){}
     }
