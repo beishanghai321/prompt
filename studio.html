@@ -1647,9 +1647,11 @@ function asrStepShow(n){
   $("asrStep3").hidden = n !== 3;
 }
 
+let ASR_ASKED = false;
 async function askLocalAsr(){
   const mask = $("asrMask");
-  if (!mask) return;
+  if (!mask || ASR_ASKED) return;
+  ASR_ASKED = true;
   if (asrPref() === "never"){ return; }
 
   // 已选择过本地模式：视为已就绪，不再弹窗（缓存可能被清或换了网址，重新下载即可）
@@ -1657,7 +1659,7 @@ async function askLocalAsr(){
   const cached = choseLocal || await hasCachedModel();
   if (cached){
     if (!choseLocal) setAsrPref("local");
-    localAsrInit(function(){ followStatus("本地识别就绪（离线）", false); },
+    localAsrInit(function(){ followStatus("本地识别就绪（离线）", false); if (mask && !mask.hidden) asrModalOpen(false); },
                  { silent:true, onProgress:(file,pct)=>{
                      $("saveHint").textContent = "正在准备本地模型 " + Math.round(pct||0) + "%";
                      $("saveHint").style.color = "var(--ink-3)";
