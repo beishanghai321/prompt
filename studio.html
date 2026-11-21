@@ -332,7 +332,7 @@
 
   /* 本地模型询问（居中 + 毛玻璃） */
   .asrmask{
-    position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;
     background:rgba(245,245,247,.55);
     -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
     opacity:0;pointer-events:none;transition:opacity .28s ease;
@@ -340,7 +340,8 @@
   .asrmask[hidden]{display:none}
   .asrmask.on{opacity:1;pointer-events:auto}
   .asrmodal{
-    width:min(440px,calc(100vw - 40px));background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:20px;
+    width:min(440px,calc(100vw - 40px));
+    max-height:calc(100vh - 40px);overflow:auto;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:20px;
     padding:22px 24px;box-shadow:0 30px 80px rgba(18,46,92,.18);
     transform:translateY(10px) scale(.97);opacity:0;transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .24s ease;
   }
@@ -377,7 +378,7 @@
   .asrhint{margin:0;font-size:11.5px;line-height:1.7;color:var(--ink-3)}
   .asrlist{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.9;color:var(--ink-2)}
   .asrstep{animation:asrIn .26s cubic-bezier(.2,.8,.2,1) both}
-  .asrstep[hidden]{display:none}
+  .asrstep[hidden]{display:none!important}
   @keyframes asrIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){
     .asrmask,.asrmodal,.asrstep{transition:none;animation:none}
@@ -429,7 +430,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1259";
+      window.__BUILD = "1121-1300";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
