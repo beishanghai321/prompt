@@ -1,3 +1,4 @@
+import { requireAuth } from "./session.js";
 /**
  * /api/map-ctrl —— 用 DeepSeek 把「中控配合」的每条动作指派到具体那一句台词
  *
@@ -34,6 +35,7 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  { const deny = await requireAuth(request, env); if (deny) return deny; }
   const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
   if (!sameOrigin(origin, request)) return json({ ok: false, error: "forbidden" }, 403);
 

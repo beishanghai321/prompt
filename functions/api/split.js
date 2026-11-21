@@ -1,3 +1,4 @@
+import { requireAuth } from "./session.js";
 /**
  * /api/split —— 用 DeepSeek 把一份"没有板块标题"的脚本，按内容切成若干板块
  *
@@ -22,6 +23,7 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  { const deny = await requireAuth(request, env); if (deny) return deny; }
   const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
   if (!sameOrigin(origin, request)) return json({ ok: false, error: "forbidden" }, 403);
 

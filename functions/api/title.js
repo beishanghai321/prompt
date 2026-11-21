@@ -1,3 +1,4 @@
+import { requireAuth } from "./session.js";
 /**
  * /api/title —— 用 DeepSeek 给脚本生成一个合适的标题
  *
@@ -18,6 +19,7 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  { const deny = await requireAuth(request, env); if (deny) return deny; }
   const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
   if (!sameOrigin(origin, request)) return json({ ok: false, error: "forbidden" }, 403);
 
