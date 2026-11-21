@@ -18,8 +18,19 @@ export async function onRequestGet({ request, env }) {
     ok: true,
     authed: true,
     role: data.role || "owner",
-    aiLeft: (data.role === "guest") ? (data.aiUsed ? 0 : 1) : 999
+    aiLeft: (data.role === "guest") ? ((data.aiUsed || await kvUsed(env, request, data)) ? 0 : 1) : 999
   });
+}
+
+async function kvUsed(env, request, data){
+  const kv = env && env.GUEST_KV;
+  if (!kv) return false;
+  try{
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const byIp = await kv.get("ai:ip:" + ip);
+    const byGid = data && data.gid ? await kv.get("ai:gid:" + data.gid) : null;
+    return !!(byIp || byGid);
+  }catch(_){ return false; }
 }
 
 /** 校验会话；有效返回 payload，否则 null */
@@ -54,6 +65,20 @@ export async function aiGuard(request, env) {
 
   if (data.aiUsed) {
     return { deny: json({ ok: false, error: "访客的 AI 智能整理已用完，登录后可不限次数" }, 403) };
+  }
+
+  // 二道锁：绑定了 KV 时，按 IP 记账，清 Cookie / 换无痕也绕不过去
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const kv = env.GUEST_KV;
+  if (kv) {
+    try {
+      const used = await kv.get("ai:ip:" + ip);
+      if (used) {
+        return { deny: json({ ok: false, error: "这台设备/网络的访客体验次数已用完，登录后可不限次数" }, 403) };
+      }
+      await kv.put("ai:ip:" + ip, String(Date.now()), { expirationTtl: 86400 });   // 24 小时
+      if (data.gid) await kv.put("ai:gid:" + data.gid, String(Date.now()));
+    } catch (_) { /* KV 异常不影响主流程，退回 Cookie 记账 */ }
   }
 
   const next = { ...data, aiUsed: true, exp: data.exp };
