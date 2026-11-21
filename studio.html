@@ -496,7 +496,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1616";
+      window.__BUILD = "1121-1621";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1344,7 +1344,9 @@ async function generate(lines, titleOverride, reuseId){
   SP["ctl"] = ["中控配合", "sp ctl"];
   SP.__order = parsed.speakers.map(s => s.key);
 
-  const title = (titleOverride !== undefined ? String(titleOverride) : $("optTitle").value).trim();
+  const aiOnNow = !!($("optAiCtrl") && $("optAiCtrl").checked);
+  let title = (titleOverride !== undefined ? String(titleOverride) : $("optTitle").value).trim();
+  if (!title && !aiOnNow){ title = extractTitle(lines) || ""; if (title) setTitle(title, true); }
   if (title){
     document.title = title + " · 提词";
     $("brand").innerHTML = `<b>${esc(title)}</b>`;
@@ -1558,7 +1560,8 @@ async function handleFile(f){
     $("pFill").style.width = "100%";
     const wait = Math.max(0, 620 - (performance.now() - t0));   // 让动画看得见，但不拖沓
     await delay(wait);
-    const title = "";   // 标题交给 AI 生成或用户手填，不再从文档首行/文件名取
+    const aiOn = !!(document.getElementById("optAiCtrl") && document.getElementById("optAiCtrl").checked);
+  const title = aiOn ? "" : (extractTitle(lines) || f.name.replace(/\.[^.]+$/,"").trim());
     setTitle(title, true);
     pending = { lines, title };
     showDone(f.name, parsed);
@@ -2519,6 +2522,12 @@ $("btnReselect").onclick = () => {
   $("file").click();
 };
 
+$("paste").addEventListener("input", () => {
+  if ($("optAiCtrl") && $("optAiCtrl").checked) return;
+  const ls = textToLines($("paste").value || "");
+  if (ls.length) setTitle(extractTitle(ls) || "", true);
+});
+
 $("btnGen").onclick = () => {
   const text = $("paste").value.trim();
   if (!text){
@@ -2528,7 +2537,7 @@ $("btnGen").onclick = () => {
     return;
   }
   const ls = textToLines(text);
-  // 标题一律不自动取首行：留空则由 AI（开启时）或板块名兜底
+  if (!($("optAiCtrl") && $("optAiCtrl").checked)) setTitle(extractTitle(ls) || "", true);
   generate(ls);
 };
 
