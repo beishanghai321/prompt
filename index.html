@@ -32,10 +32,10 @@
   body{
     background:var(--canvas);color:var(--ink);font-family:var(--font);
     -webkit-font-smoothing:antialiased;letter-spacing:.01em;
-    min-height:100vh;display:flex;flex-direction:column;
+    min-height:100vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px);
   }
   @media (min-height:700px){
-    body{height:100vh;overflow:hidden}
+    body{min-height:100vh}
   }
   body.leaving{opacity:0;transform:translateY(-6px);transition:opacity .26s ease,transform .26s ease}
 

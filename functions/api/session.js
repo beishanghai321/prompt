@@ -64,25 +64,31 @@ export async function aiGuard(request, env) {
 
   if (data.role !== "guest") return {};
 
+  const now = Date.now();
+  const LEASE = 120 * 1000;          // 一次「AI 智能整理」包含多次后端调用，2 分钟租期
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const kv = env.GUEST_KV;
+
+  let kvTs = 0;
+  if (kv) {
+    try { kvTs = Number(await kv.get("ai:ip:" + ip)) || 0; } catch (_) { kvTs = 0; }
+  }
+
+  // 已经用过：租期内（同一次整理的多步调用）放行，租期外一律拒绝
   if (data.aiUsed) {
+    if ((data.leaseUntil && now < data.leaseUntil) || (kvTs && now - kvTs < LEASE)) return {};
     return { deny: json({ ok: false, error: "访客的 AI 智能整理已用完，登录后可不限次数" }, 403) };
   }
 
-  // 二道锁：绑定了 KV 时，按 IP 记账，清 Cookie / 换无痕也绕不过去
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  const kv = env.GUEST_KV;
-  if (kv) {
-    try {
-      const used = await kv.get("ai:ip:" + ip);
-      if (used) {
-        return { deny: json({ ok: false, error: "这台设备/网络的访客体验次数已用完，登录后可不限次数" }, 403) };
-      }
-      await kv.put("ai:ip:" + ip, String(Date.now()), { expirationTtl: 86400 });   // 24 小时
-      if (data.gid) await kv.put("ai:gid:" + data.gid, String(Date.now()));
-    } catch (_) { /* KV 异常不影响主流程，退回 Cookie 记账 */ }
+  // 首次使用：IP 已被别人用过且在租期外 → 拒绝（清 Cookie 也绕不过）
+  if (kvTs && now - kvTs >= LEASE) {
+    return { deny: json({ ok: false, error: "这台设备/网络的访客体验次数已用完，登录后可不限次数" }, 403) };
+  }
+  if (kv && !kvTs) {
+    try { await kv.put("ai:ip:" + ip, String(now), { expirationTtl: 86400 }); } catch (_) { /* KV 异常则退回 Cookie 记账 */ }
   }
 
-  const next = { ...data, aiUsed: true, exp: data.exp };
+  const next = { ...data, aiUsed: true, leaseUntil: now + LEASE, exp: data.exp };
   const token = await sign(next, secretOf(env));
   return {
     cookie: `tyc_sess=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${GUEST_COOKIE_TTL}`
