@@ -499,7 +499,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1634";
+      window.__BUILD = "1121-1639";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1569,6 +1569,7 @@ async function handleFile(f){
     setTitle(title, true);
     pending = { lines, title };
     showDone(f.name, parsed);
+    if (aiOn){ try{ aiTitleFromLines(lines); }catch(_){} }   // 导入即用 AI 起标题
   } catch (err){
     showDropState();
     $("stat").innerHTML = "<b style='color:#d70015'>解析失败</b>　" + err.message;
@@ -2193,7 +2194,10 @@ async function aiTitleFromLines(lines){
       body: JSON.stringify({ head, hint: (lines[0] || "").slice(0, 60) })
     });
     const data = await r.json();
-    if (data && data.ok && data.title) setTitle(data.title, true);
+    if (data && data.ok && data.title){
+      setTitle(data.title, true);
+      try{ if (pending) pending.title = data.title; }catch(_){}
+    }
   }catch(_){}
 }
 /* ---------- AI 分配中控（可选，默认关） ---------- */
