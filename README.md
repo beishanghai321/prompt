@@ -60,3 +60,20 @@ python -m http.server 8080
 ## 许可
 
 内部项目，未开源授权。
+
+## AI 兜底对齐（可选）
+
+字面匹配在「脱稿 / 意译 / 双人抢话」时会进入待命。此时前端会异步请求 `/api/align`，由 DeepSeek 在候选句里重排一次（不阻塞高亮）。
+
+- 代码：`functions/api/align.js`（Cloudflare Pages Function）
+- 启用：Pages 项目 → Settings → Environment variables → 添加 `DEEPSEEK_API_KEY`
+- 未配置时：接口返回 500，前端静默跳过，跟读照常按字面工作
+- 本地调试：`powershell -File tests/ai-proxy.ps1`（需先设 `$env:DEEPSEEK_API_KEY`），页面加参数 `?ai=http://127.0.0.1:8788/api/align`
+
+链路分工：
+
+```
+麦克风 → ASR（流式，150–300ms）→ 字面匹配 + 语义先验（本地，5–20ms）→ 高亮
+                                   ↓ 置信度 < 0.45 且距上次 > 2.5s
+                                /api/align（DeepSeek，300–900ms，异步纠正）
+```

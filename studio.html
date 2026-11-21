@@ -1394,6 +1394,11 @@ function followLocate(text){
     let sc = 0.65 * seq + 0.35 * bag;
     const dist = Math.abs(k - FLW.ptr);
     if (dist <= 40) sc += 0.05;
+    // 双人脚本：同说话人优先；抢话时"还没念过的句子"优先
+    const hit = FW.list[FW.owner[Math.min(k, FW.owner.length - 1)]];
+    const curItem = FW.list[FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)]];
+    if (hit && curItem && hit.sp && hit.sp === curItem.sp) sc += 0.04;
+    if (hit && FW.list.indexOf(hit) > FW.list.indexOf(curItem)) sc += 0.02;
     let need = 0.45;
     if (dist > 25) need = 0.58;
     if (dist > 120) need = (g2.size >= 7 ? 0.58 : 0.70);
@@ -1440,6 +1445,62 @@ function followPaint(){
   FLW.char = done;
 }
 
+/* ---------- AI 兜底：字面对不上时，交给 DeepSeek 在候选里做一次重排 ---------- */
+const FAI = (function(){
+  let ep = "/api/align";
+  try{ const q = new URLSearchParams(location.search).get("ai"); if (q) ep = q; }catch(_){}
+  return { lastAsk:0, inflight:false, enabled:true, endpoint:ep, log:[] };
+})();
+
+/* 组候选：当前位置附近 + 同说话人 + 还没念过的句子（抢话时"未念过"优先级高） */
+function fwCandidatesForAI(heard){
+  const here = FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)] || 0;
+  const cur = FW.list[here];
+  const pick = new Map();
+  const add = (idx) => {
+    if (idx < 0 || idx >= FW.list.length || pick.has(idx)) return;
+    const it = FW.list[idx];
+    pick.set(idx, { i: idx, sp: it.sp, t: it.text });
+  };
+  for (let d = -6; d <= 10; d++) add(here + d);                       // 前后窗口
+  FW.list.forEach((it, idx) => {
+    if (it.sp && cur && it.sp === cur.sp && Math.abs(idx - here) <= 60) add(idx);  // 同说话人
+  });
+  FW.list.forEach((it, idx) => { if (idx > here && idx < here + 120) add(idx); }); // 还没念的
+  return [...pick.values()].slice(0, 28);
+}
+
+async function fwAskAI(heard, onDone){
+  if (!FAI.enabled || FAI.inflight) return;
+  if (Date.now() - FAI.lastAsk < 2500) return;        // 兜底最多 2.5 秒一次
+  FAI.inflight = true; FAI.lastAsk = Date.now();
+  const candidates = fwCandidatesForAI(heard);
+  if (!candidates.length){ FAI.inflight = false; return; }
+
+  const hint = FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)] ?? -1;
+  try{
+    const r = await fetch(FAI.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: heard.slice(-160), candidates, hint })
+    });
+    const data = await r.json();
+    FAI.log.push({ t: Date.now(), index: data.index, conf: data.confidence, reason: data.reason });
+    if (data.index >= 0 && data.confidence >= 0.45){
+      const it = FW.list[data.index];
+      if (it){
+        FLW.ptr = it.start;                            // AI 给出的是"整句"，先停在句首
+        followPaint();
+        followStatus("AI 对齐 · " + (data.reason || "已纠正"));
+        onDone && onDone(data);
+      }
+    }
+  }catch(_){
+    /* 兜底失败不影响主链路 */
+  }finally{
+    FAI.inflight = false;
+  }
+}
 function followStatus(msg, warn){
   const el = $("saveHint");
   if (!el) return;
@@ -1473,7 +1534,10 @@ function startFollow(){
     FLW.transcript = txt;
     const r = followLocate(txt);
     if (r.conf >= 0.45){ FLW.ptr = r.pos; followPaint(); followStatus("跟读中 · 置信 " + Math.round(r.conf * 100) + "%"); }
-    else { followStatus("待命 · 没对上脚本（脱稿或识音不准）", true); }
+    else {
+      followStatus("待命 · 没对上脚本（脱稿或识音不准）", true);
+      fwAskAI(txt);                                  // 交给 DeepSeek 重排，异步
+    }
   };
   rec.onerror = ev => {
     const m = { "not-allowed":"麦克风被拒绝：地址栏左侧图标里改成允许", "network":"连不上语音服务（Chrome 走 Google，国内常被挡）", "no-speech":"没听到声音", "audio-capture":"找不到麦克风" };
