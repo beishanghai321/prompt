@@ -1534,7 +1534,7 @@ function localAsrInit(done){
   LASR.worker.onmessage = e => {
     const d = e.data || {};
     if (d.type === "progress") followStatus("加载模型 " + Math.round(d.pct || 0) + "%", false);
-    if (d.type === "ready"){ LASR.ready = true; followStatus("本地识别就绪（离线）", false); done && done(); }
+    if (d.type === "ready"){ clearTimeout(LASR.guard); LASR.ready = true; followStatus("本地识别就绪（离线）", false); done && done(); }
     if (d.type === "error") followStatus("本地识别出错：" + d.message, true);
     if (d.type === "text"){
       if (!d.text) return;
@@ -1547,6 +1547,8 @@ function localAsrInit(done){
   };
   LASR.worker.onerror = ev => followStatus("本地模型加载失败：" + (ev.message || "worker error"), true);
   LASR.worker.postMessage({ type:"init" });
+  clearTimeout(LASR.guard);
+  LASR.guard = setTimeout(()=>{ if(!LASR.ready) followStatus("本地模型加载超时（网络或浏览器缓存问题），可先用默认模式", true); }, 90000);
 }
 
 async function localAsrStart(){
