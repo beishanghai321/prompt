@@ -401,6 +401,21 @@
   @media (prefers-reduced-motion:reduce){
     .asrmask,.asrmodal,.asrstep{transition:none;animation:none}
   }
+  /* 板块边界编辑 */
+  .cues li.start{position:relative}
+  .cutedge{
+    position:absolute;right:-2px;top:50%;transform:translateY(-50%);
+    width:22px;height:22px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--ink-3);
+    font-size:11px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s,color .15s,border-color .15s;
+  }
+  .cues li.start:hover .cutedge{opacity:1}
+  .cutedge:hover{color:var(--blue);border-color:#c7d9f0}
+  .blkops{display:flex;gap:8px;align-items:center;margin:14px 0 2px}
+  .blkops button{
+    border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:9px;
+    padding:5px 10px;font-size:12px;cursor:pointer;font-family:var(--font);transition:.15s;
+  }
+  .blkops button:hover{color:var(--blue);border-color:#c7d9f0}
   /* 语音跟读 */
   #btnFollow.on{background:#0066cc;border-color:#0066cc;color:#fff}
   #cues li.fw{background:#fff;box-shadow:0 6px 22px rgba(18,46,92,.10)}
@@ -448,7 +463,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1351";
+      window.__BUILD = "1121-1356";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1096,12 +1111,18 @@ function renderRead(){
     if (mine.length) cards.push({ lines: mine.map(x => ({ sp:"ctl", html: esc(x.text) })), special:true, inline:true });
   });
   cards.push({ lines:[{ sp:"go",  html: esc(b.next) }], special:true });
+  cards.push({ ops:true });
   // 没能对上具体句子的条目（极少），统一放在开头提示
   at.filter(x => x.i == null || x.i < 0).forEach(x => {
     cards.push({ lines:[{ sp:"ctl", html: esc(x.text) }], special:true, inline:true });
   });
 
   $("cues").innerHTML = cards.map(c=>{
+    if (c.ops) return `<li class="opsline"><div class="blkops">` +
+      (bi > 0 ? `<button id="btnMergeUp">⤴ 并入上一块</button>` : "") +
+      `<button id="btnRenameBlk">✎ 改名</button>` +
+      `<button id="btnBlkMin">⏱ 改时长</button>` +
+      `</div></li>`;
     const firstSp = c.lines[0].sp;
     const hasBadge = !!(SP[firstSp] && SP[firstSp][0]);
     const inner = c.lines.map(ln=>{
@@ -1114,7 +1135,10 @@ function renderRead(){
       }
       return `<div class="line">${badge}<span class="say">${ln.html}</span></div>`;
     }).join("");
-    return `<li class="${c.special ? "special" : "start"}"${c.special ? "" : ` data-ci="${c.ci}"`}>${inner}</li>`;
+    if (c.special) return `<li class="special">${inner}</li>`;
+
+    const cut = `<button class="cutedge" data-ci="${c.ci}" title="从这里开始新板块">✂</button>`;
+    return `<li class="start" data-ci="${c.ci}">${cut}${inner}</li>`;
   }).join("");
 }
 
@@ -1647,6 +1671,90 @@ function followPaint(){
   }
 }
 
+/* ---------- 板块边界编辑：断开 / 合并 / 改名 / 改时长 ---------- */
+const CIRCLED_NUM = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
+
+function renumberBlocks(){
+  BLOCKS.forEach((b, i) => { b.no = CIRCLED_NUM[i] || ("(" + (i+1) + ")"); });
+  BLOCKS.forEach((b, i) => {
+    const nb = BLOCKS[i+1];
+    b.next = nb
+      ? "本块最后一句说完，就接下一块：" + nb.cues[0][1].slice(0,46) + "（【" + nb.name + "】开始）"
+      : "时间到归零，回到 ① 重新开始下一轮。";
+  });
+}
+
+function afterBlockEdit(msg){
+  renumberBlocks();
+  if (bi >= BLOCKS.length) bi = BLOCKS.length - 1;
+  left = BLOCKS[bi].dur;
+  render(); renderNav(); paintClock();
+  try{ followBuild(); }catch(_){}
+  try{ saveNow(true); }catch(_){}
+  if (msg) followStatus(msg, false);
+}
+
+function splitBlockAt(bi0, ci){
+  const b = BLOCKS[bi0];
+  if (!b || ci <= 0 || ci >= b.cues.length) return;
+  const tail = b.cues.slice(ci);
+  b.cues = b.cues.slice(0, ci);
+  const share = Math.max(1, Math.round(b.dur * tail.length / (b.cues.length + tail.length) / 60));
+  const dur = Math.max(60, share * 60);
+  b.dur = Math.max(60, b.dur - dur);
+  const nb = {
+    no: "", name: "新板块", win: "约 " + Math.round(dur/60) + " 分钟", dur,
+    cues: tail, ctrl: "", ctrlAt: [], next: ""
+  };
+  BLOCKS.splice(bi0 + 1, 0, nb);
+  afterBlockEdit("已在此处断开，记得改个名字");
+  // 让新板块名可编辑
+  renderNav();
+}
+
+function mergeBlockUp(bi0){
+  if (bi0 <= 0) return;
+  const prev = BLOCKS[bi0-1], cur = BLOCKS[bi0];
+  prev.cues = prev.cues.concat(cur.cues);
+  prev.dur = prev.dur + cur.dur;
+  prev.win = "约 " + Math.round(prev.dur/60) + " 分钟";
+  prev.ctrl = [prev.ctrl, cur.ctrl].filter(Boolean).join("；");
+  BLOCKS.splice(bi0, 1);
+  if (bi0 <= bi) bi = Math.max(0, bi - 1);
+  afterBlockEdit("已并入上一块");
+}
+
+function renameBlock(bi0){
+  const b = BLOCKS[bi0];
+  const v = prompt("板块名称：", b.name);
+  if (v == null) return;
+  b.name = String(v).trim().slice(0, 16) || b.name;
+  afterBlockEdit("已改名");
+}
+
+function editBlockMinutes(bi0){
+  const b = BLOCKS[bi0];
+  const v = prompt("这一块多少分钟？", String(Math.round(b.dur/60)));
+  if (v == null) return;
+  const m = Math.max(1, Math.min(180, parseInt(v, 10) || Math.round(b.dur/60)));
+  b.dur = m * 60;
+  b.win = "约 " + m + " 分钟";
+  afterBlockEdit("时长已改为 " + m + " 分钟");
+}
+
+/* 事件绑定（用事件委托，重渲染后依然有效） */
+document.addEventListener("click", e => {
+  const cut = e.target.closest && e.target.closest(".cutedge");
+  if (cut){
+    e.stopPropagation();
+    const ci = +cut.dataset.ci;
+    splitBlockAt(bi, ci + 0);   // 这一句成为新板块的第一句
+    return;
+  }
+  if (e.target.closest && e.target.closest("#btnMergeUp")){ mergeBlockUp(bi); return; }
+  if (e.target.closest && e.target.closest("#btnRenameBlk")){ renameBlock(bi); return; }
+  if (e.target.closest && e.target.closest("#btnBlkMin")){ editBlockMinutes(bi); return; }
+}, true);
 /* ---------- 收起态：hover 显示板块名 ---------- */
 let railTip = null;
 function showRailTip(btn){
