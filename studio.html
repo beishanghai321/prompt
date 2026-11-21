@@ -1510,6 +1510,7 @@ function followStatus(msg, warn){
 
 function stopFollow(){
   FLW.on = false;
+  try{ localAsrStop(); }catch(_){}
   if (FLW.rec){ try { FLW.rec.onend = null; FLW.rec.stop(); } catch(_){} FLW.rec = null; }
   $("btnFollow").classList.remove("on");
   $("btnFollow").textContent = "🎤 跟读";
@@ -1517,9 +1518,77 @@ function stopFollow(){
   renderRead();
 }
 
+/* ---------- 本地 ASR 引擎（whisper-tiny，离线，可选） ---------- */
+const LASR = { worker:null, ctx:null, node:null, ready:false, buf:[], bufLen:0, sr:16000, chunkSec:2.5, overlapSec:0.5, id:0 };
+
+function localAsrInit(done){
+  if (LASR.ready){ done && done(); return; }
+  followStatus("加载本地模型…", false);
+  LASR.worker = new Worker("assets/asr/whisper-worker.js");
+  LASR.worker.onmessage = e => {
+    const d = e.data || {};
+    if (d.type === "progress") followStatus("加载模型 " + Math.round(d.pct || 0) + "%", false);
+    if (d.type === "ready"){ LASR.ready = true; followStatus("本地识别就绪（离线）", false); done && done(); }
+    if (d.type === "error") followStatus("本地识别出错：" + d.message, true);
+    if (d.type === "text"){
+      if (!d.text) return;
+      FLW.transcript = (FLW.transcript + d.text).slice(-400);
+      const r = followLocate(FLW.transcript);
+      if (r.conf >= 0.45){ FLW.ptr = r.pos; followPaint(); followStatus("本地跟读 · 置信 " + Math.round(r.conf*100) + "%"); }
+      else { followStatus("待命 · 本地识别没对上", true); }
+      followStatus("本地识别 " + Math.round(d.ms) + "ms / " + LASR.chunkSec + "s 音频", false);
+    }
+  };
+  LASR.worker.onerror = ev => followStatus("本地模型加载失败：" + (ev.message || "worker error"), true);
+  LASR.worker.postMessage({ type:"init" });
+}
+
+async function localAsrStart(){
+  if (LASR.ctx) return;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount:1, echoCancellation:true, noiseSuppression:true } });
+  const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  LASR.ctx = ctx;
+  const src = ctx.createMediaStreamSource(stream);
+  const node = ctx.createScriptProcessor(4096, 1, 1);
+  LASR.node = node;
+  node.onaudioprocess = ev => {
+    const inp = ev.inputBuffer.getChannelData(0);
+    LASR.buf.push(new Float32Array(inp));
+    LASR.bufLen += inp.length;
+    const need = Math.floor(LASR.sr * LASR.chunkSec);
+    if (LASR.bufLen < need) return;
+
+    const all = new Float32Array(LASR.bufLen);
+    let off = 0;
+    for (const b of LASR.buf){ all.set(b, off); off += b.length; }
+    const chunk = all.slice(0, need);
+    const keep = all.slice(Math.floor(LASR.sr * (LASR.chunkSec - LASR.overlapSec)));
+    LASR.buf = [keep]; LASR.bufLen = keep.length;
+
+    LASR.worker.postMessage({ type:"audio", id:++LASR.id, pcm: chunk }, [chunk.buffer]);
+  };
+  src.connect(node);
+  node.connect(ctx.destination);   // 必须接出去才会跑
+  followStatus("听音中（本地识别），请念脚本", false);
+}
+
+function localAsrStop(){
+  try{ LASR.node && LASR.node.disconnect(); }catch(_){}
+  try{ LASR.ctx && LASR.ctx.close(); }catch(_){}
+  LASR.ctx = null; LASR.node = null; LASR.buf = []; LASR.bufLen = 0;
+}
 function startFollow(){
+  const useLocal = /[?&]asr=local/.test(location.search);
+  if (useLocal){
+    FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
+    $("btnFollow").classList.add("on");
+    $("btnFollow").textContent = "■ 停止";
+    if (!FW) followBuild();
+    localAsrInit(() => localAsrStart().catch(err => followStatus("麦克风打不开：" + err.message, true)));
+    return;
+  }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){ followStatus("这个浏览器没有语音识别（用 Chrome / Edge）", true); return; }
+  if (!SR){ followStatus("这个浏览器没有语音识别（用 Chrome / Edge），可加 ?asr=local 走本地模型", true); return; }
   if (!FW) followBuild();
   FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
   $("btnFollow").classList.add("on");

@@ -1,0 +1,5 @@
+# 本地 whisper 模型与 ORT 运行库（体积大，走镜像远载或 R2，不进仓库）
+assets/asr/models/
+assets/asr/ort/
+node_modules/
+asr-build/

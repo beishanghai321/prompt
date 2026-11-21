@@ -77,3 +77,20 @@ python -m http.server 8080
                                    ↓ 置信度 < 0.45 且距上次 > 2.5s
                                 /api/align（DeepSeek，300–900ms，异步纠正）
 ```
+## 本地离线识别（whisper-tiny，可选）
+
+页面上加 `?asr=local` 走本地模型（离线、免费、不联网）；不加则用浏览器自带语音识别。
+
+- worker：`assets/asr/whisper-worker.js`（transformers.js + onnxruntime-web，已打包，758KB）
+- 模型：**不进仓库**（40MB+，且合并版解码器 29MB 超过 Pages 单文件 25MB 上限）
+  - 默认远端：worker 找不到站内模型时，自动回落到 `https://hf-mirror.com`，首次加载后浏览器缓存，之后可离线
+  - 想完全站内：把模型放到 `assets/asr/models/Xenova/whisper-tiny/`、ORT 运行库放到 `assets/asr/ort/`（本地开发够用；线上建议放 R2 再改 `env.localModelPath`）
+- 实测（本机 i7，wasm 单线程）：8.12s 音频解码 2.85s，RTF≈0.35；模型冷启动约 1s
+
+延迟参考：
+
+| 方案 | 端到端延迟 | 成本 |
+|---|---|---|
+| 浏览器语音识别（默认） | 0.5–1.5s | 0（受网络/区域影响大） |
+| 本地 whisper-tiny | 约 3s（2.5s 分块 + 0.9s 解码） | 0，离线可用 |
+| 云端流式 ASR | 0.2–0.3s | ¥2–3/小时 |
