@@ -27,8 +27,10 @@ export async function onRequestOptions({ request }) {
   return new Response(null, { status: 204, headers: corsHeaders(origin, request) });
 }
 
-export async function onRequestGet() {
-  return json({ ok: true, endpoint: "/api/map-ctrl", configured: "server-side-only" });
+export async function onRequestGet({ env }) {
+  // 只回一个布尔值：方便你在浏览器里确认密钥是否已生效，不暴露任何内容
+  return json({ ok: true, endpoint: "/api/map-ctrl", keyConfigured: !!(env && env.DEEPSEEK_API_KEY) },
+              200, { "Cache-Control": "no-store" });
 }
 
 export async function onRequestPost({ request, env }) {
