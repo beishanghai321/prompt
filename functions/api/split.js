@@ -1,4 +1,4 @@
-import { requireAuth } from "./session.js";
+import { aiGuard } from "./session.js";
 /**
  * /api/split —— 用 DeepSeek 把一份"没有板块标题"的脚本，按内容切成若干板块
  *
@@ -23,7 +23,9 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  { const deny = await requireAuth(request, env); if (deny) return deny; }
+  const gate = await aiGuard(request, env);
+  if (gate.deny) return gate.deny;
+  const gateCookie = gate.cookie ? { "Set-Cookie": gate.cookie } : {};
   const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
   if (!sameOrigin(origin, request)) return json({ ok: false, error: "forbidden" }, 403);
 
@@ -77,7 +79,7 @@ export async function onRequestPost({ request, env }) {
 
     const blocks = normalize(parsed && parsed.blocks, cues.length);
     if (!blocks.length) return json({ ok: false, error: "no blocks" }, 502);
-    return json({ ok: true, blocks }, 200, { "Cache-Control": "no-store" });
+    return json({ ok: true, blocks }, 200, { "Cache-Control": "no-store", ...gateCookie });
   } catch (e) {
     clearTimeout(timer);
     return json({ ok: false, error: "timeout" }, 504);

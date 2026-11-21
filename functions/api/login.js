@@ -41,7 +41,7 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, error: "账号或密码不正确" }, 401);
   }
 
-  const token = await sign({ u, exp: Date.now() + TTL * 1000 }, secretOf(env));
+  const token = await sign({ role: "owner", u, exp: Date.now() + TTL * 1000 }, secretOf(env));
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: {
@@ -139,9 +139,9 @@ export function rateOk(ip) {
   return rec.n <= RATE.max;
 }
 
-export function json(obj, status = 200) {
+export function json(obj, status = 200, extra = {}) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }
+    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extra }
   });
 }

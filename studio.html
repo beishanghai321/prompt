@@ -513,7 +513,15 @@ html.auth-pending{background:#fff}
   try{
     fetch("/api/session", { cache: "no-store" })
       .then(function(r){ return r.ok ? r.json() : { authed:false }; })
-      .then(function(d){ go(!!(d && d.authed)); })
+      .then(function(d){
+        if (d && d.authed){
+          try{
+            sessionStorage.setItem("tyc_role", d.role || "owner");
+            sessionStorage.setItem("tyc_ai_left", String(d.aiLeft == null ? 999 : d.aiLeft));
+          }catch(_){}
+        }
+        go(!!(d && d.authed));
+      })
       .catch(function(){ go(false); });
   }catch(_){ go(false); }
 })();
@@ -521,7 +529,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1738";
+      window.__BUILD = "1121-1743";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1624,6 +1632,7 @@ async function handleFile(f){
 /* 视图切换：淡出淡入，不硬跳 */
 let pushedPrompter = false;
 function enterPrompter(){
+  try{ applyGuestLimits(); }catch(_){}
   // 每次进入都重置：第一块、全文视图、滚动到顶
   try{
     allView = true;
@@ -2176,6 +2185,7 @@ async function aiMakeTitle(){
     if (!data || !data.ok || !data.title) return;
     const t = data.title;
     setTitle(t, true);
+    if (isGuest()) setGuestAiLeft(0);
     document.title = t + " · 提词";
     $("brand").innerHTML = `<b>${esc(t)}</b>`;
     // 同步到历史记录标题
@@ -2615,6 +2625,51 @@ $("cues").addEventListener("scroll", () => {
     }
   });
 }, { passive: true });
+/* ---------- 访客限制 ---------- */
+function isGuest(){
+  try{ return sessionStorage.getItem("tyc_role") === "guest"; }catch(_){ return false; }
+}
+function guestAiLeft(){
+  try{ const v = sessionStorage.getItem("tyc_ai_left"); return v === null ? 1 : (+v || 0); }catch(_){ return 1; }
+}
+function setGuestAiLeft(n){
+  try{ sessionStorage.setItem("tyc_ai_left", String(n)); }catch(_){}
+}
+function applyGuestLimits(){
+  if (!isGuest()) return;
+
+  // 跟读：禁用
+  const fb = $("btnFollow");
+  if (fb){
+    fb.classList.add("disabled");
+    fb.setAttribute("title","访客不可使用语音跟读，登录后可开启");
+    fb.textContent = "🎤 跟读（访客不可用）";
+    fb.style.opacity = ".45";
+    fb.style.cursor = "not-allowed";
+  }
+
+  // AI 智能整理：次数用尽则关掉并禁用
+  const ai = $("optAiCtrl");
+  const left = guestAiLeft();
+  if (ai){
+    if (left <= 0){
+      ai.checked = false;
+      ai.disabled = true;
+      const lab = ai.parentElement;
+      if (lab) lab.setAttribute("title","访客的 AI 智能整理已用完，登录后可不限次数");
+    }
+  }
+
+  // 顶部提示
+  try{
+    if ($("guestTip")) return;
+    const tip = document.createElement("div");
+    tip.id = "guestTip";
+    tip.textContent = left > 0 ? "访客模式 · AI 智能整理剩余 1 次" : "访客模式 · AI 已用完，基础功能不受限";
+    tip.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:30;background:rgba(255,255,255,.92);border:1px solid #e6e6eb;border-radius:999px;padding:6px 14px;font-size:12px;color:#6e6e73;box-shadow:0 6px 20px rgba(16,32,56,.08)";
+    document.body.appendChild(tip);
+  }catch(_){}
+}
 /* ---------- 视图切换：全文 <-> 分块 ---------- */
 function applyViewLabel(){
   const b = $("btnView");
@@ -2625,6 +2680,7 @@ function setAllView(v){
   allView = !!v;
   try{ localStorage.setItem("tyc_allview", allView ? "1" : "0"); }catch(_){}
   applyViewLabel(); document.body.classList.toggle("allview", allView || followView);
+try{ applyGuestLimits(); }catch(_){}
   render();
   try{ resetScrollTop(); }catch(_){}
 }
@@ -2639,7 +2695,9 @@ $("btnView").onclick = () => {
   }
 };
 applyViewLabel(); document.body.classList.toggle("allview", allView || followView);
+try{ applyGuestLimits(); }catch(_){}
 $("btnFollow").onclick = () => {
+  if (isGuest()){ followStatus("访客不可使用语音跟读，登录后可开启", true); return; }
   if (FLW.on){ stopFollow(); return; }
   asrModalOpen(true, "fwAsk");
   $("fwGo").onclick = () => { asrModalOpen(false, "fwAsk"); setTimeout(startFollow, 180); };

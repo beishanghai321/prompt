@@ -1,4 +1,4 @@
-import { requireAuth } from "./session.js";
+import { aiGuard } from "./session.js";
 /**
  * /api/title —— 用 DeepSeek 给脚本生成一个合适的标题
  *
@@ -19,7 +19,9 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  { const deny = await requireAuth(request, env); if (deny) return deny; }
+  const gate = await aiGuard(request, env);
+  if (gate.deny) return gate.deny;
+  const gateCookie = gate.cookie ? { "Set-Cookie": gate.cookie } : {};
   const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
   if (!sameOrigin(origin, request)) return json({ ok: false, error: "forbidden" }, 403);
 
@@ -72,7 +74,7 @@ export async function onRequestPost({ request, env }) {
     try { parsed = JSON.parse(raw); } catch { parsed = {}; }
     const title = String(parsed.title || "").replace(/[《》「」【】"]/g, "").trim().slice(0, 20);
     if (!title) return json({ ok: false, error: "empty" }, 502);
-    return json({ ok: true, title }, 200, { "Cache-Control": "no-store" });
+    return json({ ok: true, title }, 200, { "Cache-Control": "no-store", ...gateCookie });
   } catch (e) {
     clearTimeout(timer);
     return json({ ok: false, error: "timeout" }, 504);
