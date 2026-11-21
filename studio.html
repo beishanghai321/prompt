@@ -429,7 +429,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1255";
+      window.__BUILD = "1121-1259";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -443,6 +443,16 @@
         // 老浏览器（Edge 18 / Safari 12 等）连脚本都解析不了，先给出明确提示
         try { eval("var __o={};__o&&__o.a?.b;__o.a??1;"); }
         catch(err){ show("浏览器版本过低（不支持可选链 ?. / ??），请用 Chrome 或新版 Edge 打开"); }
+        document.addEventListener("DOMContentLoaded", function(){
+          var m = document.getElementById("asrMask");
+          if (!m) return;
+          var cs = window.getComputedStyle ? getComputedStyle(m) : null;
+          if (!cs || cs.position !== "fixed"){
+            m.setAttribute("hidden", "hidden");
+            m.style.display = "none";
+          }
+        });
+
         if (typeof window.fetch !== "function" || typeof window.Worker !== "function") {
           show("浏览器缺少必要能力（fetch / Worker），请换 Chrome 或新版 Edge");
         }
@@ -598,6 +608,7 @@
         <button id="btnEdit" title="修改台词">编辑</button>
         <button id="btnSave" title="保存到本机">保存</button>
         <span class="savehint" id="saveHint"></span>
+      <span id="buildTag" style="font-size:10.5px;color:#c7c7cc;margin-left:8px"></span>
       </div>
     </header>
     <ol class="cues" id="cues"></ol>
@@ -1839,6 +1850,7 @@ function startFollow(){
 }
 
 $("btnFollow").onclick = () => { if (FLW.on) stopFollow(); else startFollow(); };
+try{ $("buildTag").textContent = window.__BUILD || ""; }catch(_){}
 /* 侧边栏收起 / 展开 */
 function setRail(collapsed){
   $("rail").classList.toggle("collapsed", collapsed);
