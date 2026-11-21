@@ -448,7 +448,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1339";
+      window.__BUILD = "1121-1351";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -917,13 +917,18 @@ function isPersonName(n){
   if (ROLE_TAIL.test(n)) return true;
   if ((COLON_NAMES.get(n) || 0) >= 2) return true;   // 反复出现的短名字
   if (!/^[\u4e00-\u9fa5A-Za-z·]+$/.test(n)) return false;     // 带符号/emoji 的不是名字
-  if (/^(吃法|用法|用量|提醒|注意|建议|重点|总结|步骤|方法|福利|价格|活动|机制|产品|人群|禁忌|搭配|保存|功效|成分|时间|地点|备注|说明)/.test(n)) return false;
+  if (/^(吃法|用法|用量|提醒|注意|建议|重点|总结|步骤|方法|福利|价格|活动|机制|产品|人群|禁忌|搭配|保存|功效|成分|时间|地点|备注|说明|中医|西医|大家|我们|家人|朋友)/.test(n)) return false;
+  if (/(认为|表示|指出|强调|提醒|建议|回答|解释|补充|总结|说到|讲到|觉得|看到|听到)$/.test(n)) return false;
   return n.length >= 2 && n.length <= 4;             // 2—4 字的短名字
 }
 
 function detectSpeaker(line){
   let m = line.match(RE_SPEAKER_BR);
-  if (m) return { sp: m[1].trim(), t: m[2].trim() };
+  if (m){
+    const who = m[1].trim();
+    const rest = m[2].replace(/^[：:、，,\s]+/, "").trim();
+    return { sp: who, t: rest, headerOnly: rest.length === 0 };
+  }
 
   m = line.match(RE_SPEAKER_COL);
   if (m){
@@ -984,8 +989,9 @@ function parseScript(lines){
 
     const sp = detectSpeaker(line);
     if (sp){
-      if (!sp.t) continue;
       cur.lastSp = sp.sp;
+      // 只标了说话人（如「【曹医生】：」），后面的段落自动归给他，不产生空台词
+      if (sp.headerOnly || !sp.t) continue;
       cur.cues.push({ sp: sp.sp, t: sp.t });
       continue;
     }
@@ -1229,7 +1235,11 @@ async function generate(lines, titleOverride){
   SS.set("tyc_lines", JSON.stringify(lines));
   SS.set("tyc_title", title);
   currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""));
-  try{ aiAssignCtrl(); }catch(_){}
+  try{
+    aiSplitBlocks(lines, parsed).then(function(split){
+      try{ aiAssignCtrl(); }catch(_){}
+    });
+  }catch(_){ }
 }
 
 /* 历史与当前脚本存在「这台电脑的浏览器」里：关标签/重启浏览器都还在；
@@ -1747,6 +1757,53 @@ function stopFollow(){
   renderRead();
 }
 
+/* ---------- AI 智能分段：脚本没有板块标题时，请 AI 按内容切段 ---------- */
+async function aiSplitBlocks(lines, parsed){
+  if (!($("optAiCtrl") && $("optAiCtrl").checked)) return false;
+  if (BLOCKS.length > 1) return false;                 // 已经有板块标题，不用动
+
+  const cues = BLOCKS[0].cues.map(c => ({ sp: c[0], t: c[1] }));
+  if (cues.length < 6) return false;
+
+  try{
+    $("stat").innerHTML = "正在用 AI 规划板块…";
+    const r = await fetch("/api/split", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ totalMinutes: 45, cues })
+    });
+    const data = await r.json();
+    if (!data || !data.ok || !Array.isArray(data.blocks) || data.blocks.length < 2) return false;
+
+    const CIRCLED = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
+    const rebuilt = data.blocks.map((b, i) => ({
+      no: CIRCLED[i] || ("(" + (i+1) + ")"),
+      name: b.name,
+      win: "约 " + b.minutes + " 分钟",
+      dur: b.minutes * 60,
+      cues: cues.slice(b.from, b.to + 1).map(c => [c.sp, c.t]),
+      ctrl: "",
+      ctrlAt: []
+    })).filter(b => b.cues.length);
+
+    if (rebuilt.length < 2) return false;
+    // 重新计算"切下一板块"提示
+    rebuilt.forEach((b, i) => {
+      const nb = rebuilt[i+1];
+      b.next = nb
+        ? "本块最后一句说完，就接下一块：" + (nb.cues[0][1].slice(0,46)) + "（【" + nb.name + "】开始）"
+        : "时间到归零，回到 ① 重新开始下一轮。";
+    });
+
+    BLOCKS = rebuilt;
+    BLOCKS.forEach(b => { b.ctrlAt = assignCtrlToCues(b); });
+    bi = 0; left = BLOCKS[0].dur;
+    render(); renderNav();
+    $("stat").innerHTML = "AI 已把脚本切成 " + BLOCKS.length + " 个板块";
+    return true;
+  }catch(e){
+    return false;
+  }
+}
 /* ---------- AI 分配中控（可选，默认关） ---------- */
 async function aiAssignCtrl(){
   const on = ($("optAiCtrl") && $("optAiCtrl").checked);
