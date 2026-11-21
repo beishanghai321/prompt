@@ -490,7 +490,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1542";
+      window.__BUILD = "1121-1547";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1147,8 +1147,10 @@ function renderAll(){
 function nextTextFor(bi0){
   const nb = BLOCKS[bi0 + 1];
   if (!nb) return "时间到归零，回到 ① 重新开始下一轮。";
-  const first = String(nb.cues[0] ? nb.cues[0][1] : "");
-  return first.length > 60 ? first.slice(0, 60) + "…" : first;
+  const c0 = nb.cues[0] || ["", ""];
+  const first = String(c0[1] || "");
+  const short = first.length > 60 ? first.slice(0, 60) + "…" : first;
+  return (c0[0] ? c0[0] + "：" : "") + short;
 }
 function renderRead(){
   const b = BLOCKS[bi];
@@ -1345,6 +1347,7 @@ async function generate(lines, titleOverride){
   try{
     aiSplitBlocks(lines, parsed).then(function(split){
       try{ aiAssignCtrl(); }catch(_){}
+      try{ aiMakeTitle(); }catch(_){}
     });
   }catch(_){ }
 }
@@ -1803,18 +1806,28 @@ function followPaint(){
 
 /* 手动模式：在板块末尾继续向下滑，快捷进入下一板块 */
 let wheelLock = 0;
+let arrivedAt = 0;            // 到达顶部/底部的时刻
+let arrivedEdge = null;       // "bottom" | "top" | null
 $("cues").addEventListener("wheel", e => {
   if (followView) return;
-  if (Date.now() < wheelLock) return;
   const el = e.currentTarget;
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 6;
   const atTop = el.scrollTop <= 4;
-  if (e.deltaY > 0 && atBottom){
-    wheelLock = Date.now() + 700;
-    if (bi < BLOCKS.length - 1) goSmooth(bi + 1);
-  } else if (e.deltaY < 0 && atTop){
-    wheelLock = Date.now() + 700;
-    if (bi > 0) goSmooth(bi - 1);
+  const edge = atBottom ? "bottom" : (atTop ? "top" : null);
+
+  if (!edge){ arrivedEdge = null; arrivedAt = 0; return; }
+  if (edge !== arrivedEdge){ arrivedEdge = edge; arrivedAt = Date.now(); return; }   // 刚到达：这次不切
+  if (Date.now() - arrivedAt < 260) return;                                          // 到边后要"停一下"
+  if (Date.now() < wheelLock) return;
+
+  if (edge === "bottom" && e.deltaY > 0 && bi < BLOCKS.length - 1){
+    wheelLock = Date.now() + 1200;
+    arrivedEdge = null; arrivedAt = 0;
+    goSmooth(bi + 1);
+  } else if (edge === "top" && e.deltaY < 0 && bi > 0){
+    wheelLock = Date.now() + 1200;
+    arrivedEdge = null; arrivedAt = 0;
+    goSmooth(bi - 1);
   }
 }, { passive: true });
 /* ---------- 板块边界编辑：断开 / 合并 / 改名 / 改时长 ---------- */
@@ -2047,6 +2060,37 @@ function stopFollow(){
   renderRead();
 }
 
+/* ---------- AI 生成标题（脚本首行常是文件名，不适合当标题） ---------- */
+async function aiMakeTitle(){
+  if (!($("optAiCtrl") && $("optAiCtrl").checked)) return;
+  const manual = ($("optTitle").value || "").trim();
+  if (manual) return;                                    // 用户自己填了就不动
+
+  const head = [];
+  BLOCKS.forEach(b => b.cues.forEach(c => { if (head.length < 18) head.push(c[1]); }));
+  if (!head.length) return;
+
+  const hint = (document.getElementById("paste").value || "").split("\n").find(x => x.trim()) || "";
+  try{
+    const r = await fetch("/api/title", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ head, hint: hint.slice(0, 60) })
+    });
+    const data = await r.json();
+    if (!data || !data.ok || !data.title) return;
+    const t = data.title;
+    $("optTitle").value = t;
+    document.title = t + " · 提词";
+    $("brand").innerHTML = `<b>${esc(t)}</b>`;
+    // 同步到历史记录标题
+    try{
+      const arr = getHist();
+      const rec = arr.find(x => x.id === currentKey);
+      if (rec){ rec.title = t; setHist(arr); renderHist(); }
+    }catch(_){}
+    followStatus("AI 已生成标题：" + t, false);
+  }catch(_){ }
+}
 /* ---------- AI 智能分段：脚本没有板块标题时，请 AI 按内容切段 ---------- */
 async function aiSplitBlocks(lines, parsed){
   if (!($("optAiCtrl") && $("optAiCtrl").checked)) return false;
