@@ -496,7 +496,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1606";
+      window.__BUILD = "1121-1613";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1327,7 +1327,7 @@ function applyFs(){
 function bumpFs(d){ fsVh = Math.min(4.2, Math.max(1.2, +(fsVh + d).toFixed(2))); applyFs(); }
 
 /* ================= 4. 生成 ================= */
-async function generate(lines, titleOverride){
+async function generate(lines, titleOverride, reuseId){
   boldOn = $("optBold").checked;
   MAXLEN = Math.max(20, Math.min(120, +$("optLen").value || 52));
 
@@ -1361,12 +1361,12 @@ async function generate(lines, titleOverride){
   enterPrompter();
   SS.set("tyc_lines", JSON.stringify(lines));
   SS.set("tyc_title", title);
-  currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""));
+  currentKey = saveHist(lines, title || (BLOCKS[0] ? BLOCKS[0].name : ""), reuseId || null);
+  try{ aiMakeTitle(); }catch(_){}
   try{
     aiSplitBlocks(lines, parsed).then(function(split){
       try{ aiAssignCtrl(); }catch(_){}
-      try{ aiMakeTitle(); }catch(_){}
-    });
+    }).catch(function(){});
   }catch(_){ }
 }
 
@@ -1409,9 +1409,9 @@ function getHist(){
 }
 function setHist(a){ SS.set(HIST_KEY, JSON.stringify(a)); }
 
-function saveHist(lines, title){
+function saveHist(lines, title, forcedId){
   const arr = getHist();
-  const key = hashLines(lines) + "|" + title;
+  const key = forcedId || (hashLines(lines) + "|" + title);
   const now = new Date();
   const rec = {
     id: key,
@@ -1425,6 +1425,11 @@ function saveHist(lines, title){
   if (i >= 0){
     rec.date = arr[i].date;
     if (arr[i].blocks) rec.blocks = arr[i].blocks;   // 同一份脚本再次生成时，保留之前编辑过的内容
+    if (forcedId){
+      // 从历史打开：就地更新，不搬位置、不产生副本
+      arr[i] = rec;
+      setHist(arr); renderHist(); return key;
+    }
     arr.splice(i,1);
   }
   arr.unshift(rec);
@@ -1460,7 +1465,7 @@ function renderHist(){
       $("optLen").value = rec.len || 52;
       $("optBold").checked = rec.bold !== false;
       if (fresh.blocks && fresh.blocks.length){ loadBlocks(fresh.blocks, fresh.id); }
-      else { generate(fresh.lines); }
+      else { generate(fresh.lines, fresh.title, fresh.id); }
     };
     el.querySelector(".del").onclick = e => {
       e.stopPropagation();
