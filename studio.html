@@ -223,6 +223,14 @@
   .rail .tagline{font-size:10.5px;line-height:1.6;color:#a1a1a6;padding:0 16px 10px;transition:opacity .2s ease}
   .rail.collapsed .tagline{opacity:0;pointer-events:none}
   .rail.collapsed .navbtn{justify-content:center;padding-left:0;padding-right:0}
+  .rail-tip{
+    position:fixed;z-index:120;pointer-events:none;background:#fff;color:var(--ink);
+    border:1px solid var(--line);box-shadow:0 10px 28px rgba(18,46,92,.16);border-radius:10px;
+    padding:8px 12px;font-size:13.5px;line-height:1.4;white-space:nowrap;
+    opacity:0;transform:translateX(-6px);transition:opacity .16s ease,transform .2s cubic-bezier(.16,1,.3,1);
+  }
+  .rail-tip.on{opacity:1;transform:none}
+  .rail-tip em{font-style:normal;color:var(--ink-3);font-size:12px;margin-left:8px}
   .rail.collapsed .navbtn .no{min-width:0}
   .rail.collapsed .navbtn.on{background:transparent;border-color:transparent;box-shadow:none}
   .rail.collapsed .navbtn.on .no{color:var(--blue)}
@@ -284,7 +292,7 @@
     border:1px solid var(--line);border-radius:980px;padding:3px 4px;font-size:12px;color:var(--ink-3);
   }
   .fsbar button{
-    font-family:var(--font);font-size:12px;font-weight:500;color:var(--ink-2);background:transparent;
+    font-family:var(--font);font-size:14px;font-weight:500;color:var(--ink-2);background:transparent;
     border:0;border-radius:980px;width:30px;height:26px;line-height:1;cursor:pointer;transition:.16s;
   }
   .fsbar button:hover{background:#fff;color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)}
@@ -398,9 +406,9 @@
   #cues li.fw .fc-rest{color:#b9b9c0}
   .editbar{display:flex;align-items:center;gap:6px;margin-left:10px}
   .editbar button{
-    font-family:var(--font);font-size:12px;font-weight:500;color:var(--ink-2);
+    font-family:var(--font);font-size:15px;font-weight:500;color:var(--ink-2);
     background:var(--surface-2);border:1px solid var(--line);border-radius:980px;
-    padding:5px 13px;cursor:pointer;transition:.16s;
+    padding:7px 16px;cursor:pointer;transition:.16s;
   }
   .editbar button:hover{color:var(--blue);border-color:#c7d9f0;background:#fff}
   .editbar button.on{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -437,7 +445,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1313";
+      window.__BUILD = "1121-1321";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -984,7 +992,7 @@ function segment(t){
 
 function renderNav(){
   $("nav").innerHTML = BLOCKS.map((b,idx)=>
-    `<button class="navbtn${idx===bi?" on":""}" data-i="${idx}">
+    `<button class="navbtn${idx===bi?" on":""}" data-i="${idx}" data-name="${esc(b.name)}" data-win="${esc(b.win||"")}">
        <span class="no">${b.no}</span>
        <span class="nvtxt"><span class="nm">${b.name}</span><span class="tm">${b.win}</span></span>
      </button>`).join("");
@@ -1525,7 +1533,7 @@ function followPaint(){
     FLW.cue = idx;
     renderRead();
     const li0 = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
-    if (li0) li0.scrollIntoView({ block:"center", behavior:"smooth" });
+    if (li0) followScrollTo(li0);
   }
   const li = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
   if (!li) return;
@@ -1541,8 +1549,62 @@ function followPaint(){
   li.classList.add("fw");
   li.innerHTML = `<div class="line">${badge}<span class="say"><span class="fc-done">${esc(raw.slice(0,cut))}</span><span class="fc-now">${esc(raw.slice(cut,cut+1))}</span><span class="fc-rest">${esc(raw.slice(cut+1))}</span></span></div>`;
   FLW.char = done;
+
+  // 段末自动进入下一板块：本句是板块最后一句，且已念到 92% 以上
+  const lastCue = (item.ci === BLOCKS[item.bi].cues.length - 1);
+  const finished = item.len > 0 && (FLW.ptr - item.start) >= item.len * 0.82;
+  if (lastCue && finished && item.bi < BLOCKS.length - 1){
+    if (!FLW.nextAt) FLW.nextAt = Date.now() + 900;
+    else if (Date.now() >= FLW.nextAt){
+      FLW.nextAt = 0;
+      const nextBi = item.bi + 1;
+      const first = FW.list.findIndex(x => x.bi === nextBi && x.ci === 0);
+      go(nextBi);
+      if (first >= 0){ FLW.ptr = FW.list[first].start; FLW.cue = -1; }
+      setTimeout(()=>{ try{ followPaint(); }catch(_){} }, 120);
+    }
+  } else {
+    FLW.nextAt = 0;
+  }
 }
 
+/* ---------- 收起态：hover 显示板块名 ---------- */
+let railTip = null;
+function showRailTip(btn){
+  if (!$("rail").classList.contains("collapsed")) return;
+  if (!railTip){
+    railTip = document.createElement("div");
+    railTip.className = "rail-tip";
+    document.body.appendChild(railTip);
+  }
+  const name = btn.getAttribute("data-name") || "";
+  const win = btn.getAttribute("data-win") || "";
+  railTip.innerHTML = esc(name) + (win ? `<em>${esc(win)}</em>` : "");
+  const r = btn.getBoundingClientRect();
+  railTip.classList.add("on");
+  const tr = railTip.getBoundingClientRect();
+  railTip.style.left = (r.right + 12) + "px";
+  railTip.style.top = Math.round(r.top + r.height / 2 - tr.height / 2) + "px";
+}
+function hideRailTip(){ if (railTip) railTip.classList.remove("on"); }
+
+$("nav").addEventListener("mouseover", e => {
+  const b = e.target.closest(".navbtn");
+  if (b) showRailTip(b);
+});
+$("nav").addEventListener("mouseout", e => {
+  if (e.target.closest(".navbtn")) hideRailTip();
+});
+
+/* ---------- 跟读：当前句固定在上半屏 ---------- */
+function followScrollTo(li){
+  const box = $("cues");
+  if (!li || !box) return;
+  const target = box.clientHeight * 0.26;          // 目标：距可视区顶部约 26%
+  const delta = li.getBoundingClientRect().top - box.getBoundingClientRect().top - target;
+  if (Math.abs(delta) < 6) return;
+  box.scrollTo({ top: box.scrollTop + delta, behavior: "smooth" });
+}
 /* ---------- AI 兜底：字面对不上时，交给 DeepSeek 在候选里做一次重排 ---------- */
 const FAI = (function(){
   let ep = "/api/align";
