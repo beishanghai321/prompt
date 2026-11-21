@@ -1626,16 +1626,27 @@ async function askLocalAsr(){
   if (!mask) return;
   if (asrPref() === "never"){ return; }
 
-  // 已下载过：直接静默启用，不再弹窗
-  const cached = await hasCachedModel();
+  // 已选择过本地模式：视为已就绪，不再弹窗（缓存可能被清或换了网址，重新下载即可）
+  const choseLocal = asrPref() === "local";
+  const cached = choseLocal || await hasCachedModel();
   if (cached){
-    if (asrPref() !== "local") setAsrPref("local");
-    localAsrInit(function(){}, { silent:true });
+    if (!choseLocal) setAsrPref("local");
+    localAsrInit(function(){ followStatus("本地识别就绪（离线）", false); },
+                 { silent:true, onProgress:(file,pct)=>{
+                     $("saveHint").textContent = "正在准备本地模型 " + Math.round(pct||0) + "%";
+                     $("saveHint").style.color = "var(--ink-3)";
+                   } });
     return;
   }
 
   asrStepShow(1);
   asrModalOpen(true);
+  try{
+    $("asrWhy").textContent = ("caches" in window)
+      ? "本机未找到已下载的模型"
+      : "当前网址不是 https，无法读取缓存，需重新下载";
+  }catch(_){}
+
 
   const srcSel = $("asrSrc"), customRow = $("asrCustomRow"), hostInput = $("asrHost");
   srcSel.onchange = () => { customRow.hidden = srcSel.value !== "custom"; };
@@ -1919,7 +1930,8 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
             <button class="primary" id="asrYes">下载并启用</button>
             <button id="asrNo">暂不下载</button>
           </div>
-          <div class="asrfoot"><label><input type="checkbox" id="asrNever" /> 以后不再提醒</label></div>
+          <div class="asrfoot"><label><input type="checkbox" id="asrNever" /> 以后不再提醒</label>
+            <span id="asrWhy" style="font-size:11px;color:var(--ink-3)"></span></div>
         </div>
 
         <div class="asrstep" id="asrStep2" hidden>
