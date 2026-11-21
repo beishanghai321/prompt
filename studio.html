@@ -332,6 +332,9 @@
   .say em{font-style:normal;color:var(--blue);font-weight:500}
 
   .cues li.special{background:#f4faf6;border:1px solid #e0efe6;border-radius:12px;margin-top:14px;padding:10px 12px}
+  .cues li.special.inline{margin-top:6px;padding:7px 12px;background:#f6fbf8;border-color:#e6f2ea}
+  .cues li.special.inline .line{font-size:.72em;line-height:1.7;color:#2f6b4f}
+  .cues li.special.inline .line + .line{margin-top:2px}
   .cues li.special .say{color:var(--green-ink)}
 
   body.leaving{opacity:0;transition:opacity .22s ease}
@@ -445,7 +448,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1321";
+      window.__BUILD = "1121-1328";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -811,6 +814,62 @@ function extractTitle(lines){
   return "";
 }
 
+/* ---------- 中控配合：拆条 + 指派到具体那一句 ---------- */
+function splitCtrlText(text){
+  return String(text || "")
+    .split(/[；;。]/)
+    .map(x => x.trim())
+    .filter(x => x.length > 1);
+}
+function ctrlTokens(s){
+  const out = [];
+  (String(s).match(/[A-Za-z]{1,6}\d+|\d+(?:\.\d+)?/g) || []).forEach(x => out.push(x));      // 编号/数字
+  const cn = String(s).replace(/[^\u4e00-\u9fa5]/g, "");
+  for (let i = 0; i + 1 < cn.length; i++) out.push(cn.substr(i, 2));                           // 中文二字词
+  return [...new Set(out)];
+}
+/* 给每个板块算出 ctrlAt：[{i: 句内下标, text: 条目}] */
+const CTRL_STOP = ["配合","指令","公屏","置顶","贴片","提示","准备","安排","实时","播报","发放","切换","镜头","特写","下方","最后","一次","弹","发","把","用","主播","助播","助手","评论","房间","家人","直播","间","画面","屏幕","特写"];
+function ctrlPickCue(clause, cues){
+  // 1) 引号里的原文最可靠（"国食健注G20250013"、"本品不能代替药物"）
+  const quoted = [...String(clause).matchAll(/["“]([^"”]{2,40})["”]/g)].map(m => m[1].trim());
+  for (const q of quoted){
+    if (q.length < 3) continue;
+    let hit = cues.find(c => c.t.includes(q));
+    if (hit) return { i: hit.i, score: 99 };
+    // 引号里带空格/标点时，退一步用最长片段
+    const frag = q.replace(/\s+/g, "");
+    hit = cues.find(c => c.t.replace(/\s+/g, "").includes(frag.slice(0, Math.min(8, frag.length))));
+    if (hit) return { i: hit.i, score: 60 };
+  }
+  // 2) 编号 / 数字（G20250013、500、27、70）
+  const nums = String(clause).match(/[A-Za-z]{1,6}\d{2,}|\d{2,}/g) || [];
+  for (const n of nums){
+    const hit = cues.find(c => c.t.includes(n));
+    if (hit) return { i: hit.i, score: 50 };
+  }
+  // 3) 最"独特"的二字词：出现在越少的句子里越可靠
+  const cn = String(clause).replace(/[^\u4e00-\u9fa5]/g, "");
+  let best = null;
+  for (let i = 0; i + 1 < cn.length; i++){
+    const g = cn.substr(i, 2);
+    if (CTRL_STOP.includes(g)) continue;
+    const hits = cues.filter(c => c.t.includes(g));
+    if (hits.length === 0) continue;
+    if (!best || hits.length < best.n) best = { i: hits[0].i, n: hits.length, g };
+  }
+  if (best) return { i: best.i, score: 10 - best.n };
+  return { i: null, score: 0 };
+}
+function assignCtrlToCues(b){
+  const clauses = splitCtrlText(b.ctrl);
+  if (!clauses.length) return [];
+  const cues = b.cues.map((c, i) => ({ i, t: String(Array.isArray(c) ? c[1] : (c && c.t) || "") }));
+  return clauses.map(cl => {
+    const pick = ctrlPickCue(cl, cues);
+    return { i: pick.i, text: cl, score: pick.score };
+  });
+}
 /* ================= 2. 切板块 / 切句子 ================= */
 /* ---------- 兼容多种写法的解析 ----------
    板块标题认三种：
@@ -933,6 +992,7 @@ function parseScript(lines){
     cur.cues.push({ sp: cur.lastSp, t: line });
   }
 
+  blocks.forEach(b => { b.ctrlAt = assignCtrlToCues(b); });
   const out = blocks.filter(b => b.cues.length);
   const classes = ["sp zeng","sp sun","sp s3","sp s4"];
   const speakers = [];
@@ -953,7 +1013,7 @@ function parseScript(lines){
     }
     return {
       no: CIRCLED[i] || `(${i+1})`, name: b.name, win: b.win, dur: b.dur,
-      cues: b.cues.map(c => [c.sp || "", c.t]), next, ctrl: b.ctrl
+      cues: b.cues.map(c => [c.sp || "", c.t]), next, ctrl: b.ctrl, ctrlAt: b.ctrlAt || []
     };
   });
   return { blocks:data, speakers };
@@ -1020,12 +1080,19 @@ function render(){
 function renderRead(){
   const b = BLOCKS[bi];
   const cards = [];
+  const at = b.ctrlAt || [];
   b.cues.forEach(([sp,t], ci) => {
     const lines = segment(t).map((part,i) => ({ sp: i === 0 ? sp : null, html: boldOn ? emphasize(part) : esc(part) }));
     cards.push({ lines, special:false, ci });
+    // 这一句该做的中控动作，紧跟在这句后面
+    const mine = at.filter(x => x.i === ci);
+    if (mine.length) cards.push({ lines: mine.map(x => ({ sp:"ctl", html: esc(x.text) })), special:true, inline:true });
   });
   cards.push({ lines:[{ sp:"go",  html: esc(b.next) }], special:true });
-  if (b.ctrl) cards.push({ lines:[{ sp:"ctl", html: esc(b.ctrl) }], special:true });
+  // 没能对上具体句子的条目（极少），统一放在开头提示
+  at.filter(x => x.i == null || x.i < 0).forEach(x => {
+    cards.push({ lines:[{ sp:"ctl", html: esc(x.text) }], special:true, inline:true });
+  });
 
   $("cues").innerHTML = cards.map(c=>{
     const firstSp = c.lines[0].sp;
