@@ -367,6 +367,8 @@
   .asrask-b button.primary:hover{background:#0071e3;border-color:#0071e3}
   .asrfoot{margin-top:12px;font-size:11.5px;color:var(--ink-3)}
   .asrfoot input{margin-right:5px;vertical-align:-1px}
+  .asrerr{margin:0 0 10px;padding:9px 11px;border-radius:10px;background:#fff2f2;color:#b3261e;font-size:12px;line-height:1.6}
+  .asrerr[hidden]{display:none}
   .asrbar{height:8px;border-radius:999px;background:#eef1f5;overflow:hidden;margin:4px 0 12px}
   .asrbar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#0a84ff,#0066cc);transition:width .35s cubic-bezier(.2,.8,.2,1)}
   .asrhint{margin:0;font-size:11.5px;line-height:1.7;color:var(--ink-3)}
@@ -1678,6 +1680,15 @@ async function askLocalAsr(){
     }});
   };
 
+  $("asrRetry").onclick = () => {
+    $("asrErr").hidden = true; $("asrRetryRow").hidden = true;
+    $("asrBarFill").style.width = "2%"; $("asrPct").textContent = "0%";
+    localAsrInit(function(){ asrModalOpen(false); followStatus("本地识别就绪（离线）", false); },
+                 { source: srcSel.value, host: srcSel.value === "custom" ? hostInput.value.trim() : "",
+                   onProgress:(f,p)=>{ $("asrBarFill").style.width = Math.round(p||0)+"%"; $("asrPct").textContent = Math.round(p||0)+"%"; $("asrFile").textContent = "正在下载 " + (f||""); } });
+  };
+  $("asrBackSrc").onclick = () => { $("asrErr").hidden = true; $("asrRetryRow").hidden = true; asrStepShow(1); };
+
   $("asrNo").onclick = () => asrStepShow(3);
   $("asrBack").onclick = () => asrStepShow(1);
   $("asrConfirmNo").onclick = () => {
@@ -1698,7 +1709,15 @@ function localAsrInit(done, opts){
     const d = e.data || {};
     if (d.type === "progress"){ if (opts.onProgress) opts.onProgress(d.file, d.pct); }
     if (d.type === "ready"){ clearTimeout(LASR.guard); LASR.ready = true; followStatus("本地识别就绪（离线）", false); done && done(); }
-    if (d.type === "error") followStatus("本地识别出错：" + d.message, true);
+    if (d.type === "error"){
+      followStatus("本地识别出错：" + d.message, true);
+      const errBox = $("asrErr");
+      if (errBox && !$("asrStep2").hidden){
+        errBox.hidden = false;
+        errBox.textContent = "下载失败：" + d.message + "（可能是网络无法访问镜像，或浏览器代理未生效）";
+        $("asrRetryRow").hidden = false;
+      }
+    }
     if (d.type === "text"){
       if (!d.text) return;
       FLW.transcript = (FLW.transcript + d.text).slice(-400);
@@ -1938,7 +1957,12 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
           <div class="asrhead"><b>正在下载本地模型</b><span id="asrPct">0%</span></div>
           <p class="asrdesc" id="asrFile">准备中…</p>
           <div class="asrbar"><i id="asrBarFill"></i></div>
-          <p class="asrhint">下载期间不要关闭页面；完成后会把模型缓存到这台电脑，之后可离线使用。</p>
+          <div class="asrerr" id="asrErr" hidden></div>
+          <p class="asrhint" id="asrTip">下载期间不要关闭页面；完成后会把模型缓存到这台电脑，之后可离线使用。</p>
+          <div class="asrask-b" id="asrRetryRow" hidden>
+            <button class="primary" id="asrRetry">重试</button>
+            <button id="asrBackSrc">换个来源</button>
+          </div>
         </div>
 
         <div class="asrstep" id="asrStep3" hidden>
