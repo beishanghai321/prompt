@@ -345,6 +345,9 @@
     transform:translateY(10px) scale(.97);opacity:0;transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .24s ease;
   }
   .asrmask.on .asrmodal{transform:none;opacity:1}
+  .asrx{position:absolute;top:10px;right:12px;border:0;background:none;font-size:20px;line-height:1;color:#b9b9c0;cursor:pointer;padding:4px 6px;border-radius:8px;transition:color .16s,background .16s}
+  .asrx:hover{color:#1d1d1f;background:#f2f2f5}
+  .asrmodal{position:relative}
   .asrhead{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
   .asrhead b{font-size:15px}
   .asrhead span{font-size:11.5px;color:var(--ink-3)}
@@ -1670,6 +1673,7 @@ async function askLocalAsr(){
   asrStepShow(1);
   asrModalOpen(true);
   try{
+    $("asrBuild").textContent = "版本 " + (window.__BUILD || "unknown");
     $("asrWhy").textContent = ("caches" in window)
       ? "本机未找到已下载的模型"
       : "当前网址不是 https，无法读取缓存，需重新下载";
@@ -1715,6 +1719,7 @@ async function askLocalAsr(){
   };
   $("asrBackSrc").onclick = () => { $("asrErr").hidden = true; $("asrRetryRow").hidden = true; asrStepShow(1); };
 
+  $("asrX").onclick = () => { setAsrPref("skip"); asrModalOpen(false); };
   $("asrNo").onclick = () => asrStepShow(3);
   $("asrBack").onclick = () => asrStepShow(1);
   $("asrConfirmNo").onclick = () => {
@@ -1954,6 +1959,7 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
     <!-- 本地模型询问（居中模态） -->
     <div class="asrmask" id="asrMask" hidden>
       <div class="asrmodal" id="asrModal" role="dialog" aria-modal="true">
+        <button class="asrx" id="asrX" title="关闭（Esc）" aria-label="关闭">×</button>
         <div class="asrstep" id="asrStep1">
           <div class="asrhead"><b>本地离线识别</b><span>可选 · 约 40MB</span></div>
           <p class="asrdesc">开启后会把中文语音模型下载到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用浏览器自带识别（需要联网）。</p>
@@ -1977,6 +1983,7 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
           </div>
           <div class="asrfoot"><label><input type="checkbox" id="asrNever" /> 以后不再提醒</label>
             <span id="asrWhy" style="font-size:11px;color:var(--ink-3)"></span></div>
+          <div style="margin-top:6px;font-size:10.5px;color:#c7c7cc" id="asrBuild"></div>
         </div>
 
         <div class="asrstep" id="asrStep2" hidden>
