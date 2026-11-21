@@ -378,6 +378,8 @@
   .asrhint{margin:0;font-size:11.5px;line-height:1.7;color:var(--ink-3)}
   .asrlist{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.9;color:var(--ink-2)}
   .asrstep{animation:asrIn .26s cubic-bezier(.2,.8,.2,1) both}
+  #asrChkBar{width:18%;animation:asrChk 1.1s ease-in-out infinite}
+  @keyframes asrChk{0%{width:12%;margin-left:0}50%{width:52%;margin-left:24%}100%{width:12%;margin-left:72%}}
   .asrstep[hidden]{display:none!important}
   @keyframes asrIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){
@@ -430,7 +432,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1300";
+      window.__BUILD = "1121-1301";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1657,6 +1659,7 @@ function asrModalOpen(open, keepAllowed){
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("asrMask").hidden) asrModalOpen(false); });
 document.addEventListener("click", e => { if (e.target && e.target.id === "asrMask") asrModalOpen(false); }, true);
 function asrStepShow(n){
+  if ($("asrStep0")) $("asrStep0").hidden = n !== 0;
   $("asrStep1").hidden = n !== 1;
   $("asrStep2").hidden = n !== 2;
   $("asrStep3").hidden = n !== 3;
@@ -1669,10 +1672,14 @@ async function askLocalAsr(){
   ASR_ASKED = true;
   if (asrPref() === "never"){ return; }
 
-  // 已选择过本地模式：视为已就绪，不再弹窗（缓存可能被清或换了网址，重新下载即可）
+  // 先给出"检测中"的可视反馈
+  asrStepShow(0);
+  asrModalOpen(true);
   const choseLocal = asrPref() === "local";
-  const cached = choseLocal || await hasCachedModel();
+  const findCache = await hasCachedModel();
+  const cached = choseLocal || findCache;
   if (cached){
+    $("asrChkPct").textContent = "已找到";
     if (!choseLocal) setAsrPref("local");
     localAsrInit(function(){ followStatus("本地识别就绪（离线）", false); if (mask && !mask.hidden) asrModalOpen(false); },
                  { silent:true, onProgress:(file,pct)=>{
@@ -1683,7 +1690,6 @@ async function askLocalAsr(){
   }
 
   asrStepShow(1);
-  asrModalOpen(true);
   try{
     $("asrBuild").textContent = "版本 " + (window.__BUILD || "unknown");
     $("asrWhy").textContent = ("caches" in window)
@@ -1973,7 +1979,12 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
     <div class="asrmask" id="asrMask" hidden>
       <div class="asrmodal" id="asrModal" role="dialog" aria-modal="true">
         <button class="asrx" id="asrX" title="关闭（Esc）" aria-label="关闭">×</button>
-        <div class="asrstep" id="asrStep1">
+        <div class="asrstep" id="asrStep0">
+          <div class="asrhead"><b>正在检查本机模型</b><span id="asrChkPct"></span></div>
+          <p class="asrdesc">看看这台电脑是否已经下载过离线识别模型…</p>
+          <div class="asrbar"><i id="asrChkBar"></i></div>
+        </div>
+        <div class="asrstep" id="asrStep1" hidden>
           <div class="asrhead"><b>本地离线识别</b><span>可选 · 约 40MB</span></div>
           <p class="asrdesc">开启后会把中文语音模型下载到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用浏览器自带识别（需要联网）。</p>
 
