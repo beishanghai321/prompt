@@ -432,7 +432,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1301";
+      window.__BUILD = "1121-1308";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -579,17 +579,6 @@
   </nav>
 
   <main class="stage">
-
-        </div>
-      </div>
-    </div>
-      <p class="asrask-p">开启后会下载一个中文语音模型到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用的是浏览器自带识别（需要联网）。</p>
-      <div class="asrask-b">
-        <button class="primary" id="asrYes">下载并启用</button>
-        <button id="asrNo">暂不下载</button>
-      </div>
-      <div class="asrask-f"><label><input type="checkbox" id="asrNever" /> 以后不再提醒</label><span id="asrProg"></span></div>
-    </div>
     <header class="head">
       <div class="ttl">
         <div class="num" id="hNum">①</div>
@@ -1662,6 +1651,7 @@ function asrStepShow(n){
   if ($("asrStep0")) $("asrStep0").hidden = n !== 0;
   $("asrStep1").hidden = n !== 1;
   $("asrStep2").hidden = n !== 2;
+  if ($("asrStep4")) $("asrStep4").hidden = n !== 4;
   $("asrStep3").hidden = n !== 3;
 }
 
@@ -1679,16 +1669,13 @@ async function askLocalAsr(){
   const findCache = await hasCachedModel();
   const cached = choseLocal || findCache;
   if (cached){
-    $("asrChkPct").textContent = "已找到";
     if (!choseLocal) setAsrPref("local");
-    localAsrInit(function(){ followStatus("本地识别就绪（离线）", false); if (mask && !mask.hidden) asrModalOpen(false); },
-                 { silent:true, onProgress:(file,pct)=>{
-                     $("saveHint").textContent = "正在准备本地模型 " + Math.round(pct||0) + "%";
-                     $("saveHint").style.color = "var(--ink-3)";
-                   } });
+    $("asrReadyWhen").textContent = "已缓存";
+    asrStepShow(4);
+    $("asrOK").onclick = () => { asrModalOpen(false); };
+    localAsrInit(function(){}, { silent:true });
     return;
   }
-
   asrStepShow(1);
   try{
     $("asrBuild").textContent = "版本 " + (window.__BUILD || "unknown");
@@ -1718,8 +1705,9 @@ async function askLocalAsr(){
     localAsrInit(function(){
       $("asrBarFill").style.width = "100%";
       $("asrPct").textContent = "100%";
-      $("asrFile").textContent = "完成，可以开始跟读了";
-      setTimeout(()=>{ asrModalOpen(false); followStatus("本地识别就绪（离线）", false); }, 700);
+      $("asrFile").textContent = "下载完成，模型已缓存到本机";
+      $("asrDoneRow").hidden = false;
+      $("asrDone").onclick = () => asrModalOpen(false);
     }, { source, host, onProgress: (file, pct) => {
       const p = Math.max(0, Math.min(100, Math.round(pct || 0)));
       $("asrBarFill").style.width = p + "%";
@@ -1752,12 +1740,12 @@ const LASR = { worker:null, ctx:null, node:null, ready:false, buf:[], bufLen:0, 
 function localAsrInit(done, opts){
   opts = opts || {};
   if (LASR.ready){ done && done(); return; }
-  if (!opts.silent) followStatus("加载本地模型…", false);
+  /* 静默模式不写任何页面提示 */
   LASR.worker = new Worker("assets/asr/whisper-worker.js");
   LASR.worker.onmessage = e => {
     const d = e.data || {};
     if (d.type === "progress"){ if (opts.onProgress) opts.onProgress(d.file, d.pct); }
-    if (d.type === "ready"){ clearTimeout(LASR.guard); LASR.ready = true; followStatus("本地识别就绪（离线）", false); done && done(); }
+    if (d.type === "ready"){ clearTimeout(LASR.guard); LASR.ready = true; done && done(); }
     if (d.type === "error"){
       followStatus("本地识别出错：" + d.message, true);
       const errBox = $("asrErr");
@@ -1984,6 +1972,11 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
           <p class="asrdesc">看看这台电脑是否已经下载过离线识别模型…</p>
           <div class="asrbar"><i id="asrChkBar"></i></div>
         </div>
+        <div class="asrstep" id="asrStep4" hidden>
+          <div class="asrhead"><b>本地模型已就绪</b><span id="asrReadyWhen"></span></div>
+          <p class="asrdesc">这台电脑上已经缓存了离线识别模型，断网也能跟读。之后不会再提醒。</p>
+          <div class="asrask-b"><button class="primary" id="asrOK">确定</button></div>
+        </div>
         <div class="asrstep" id="asrStep1" hidden>
           <div class="asrhead"><b>本地离线识别</b><span>可选 · 约 40MB</span></div>
           <p class="asrdesc">开启后会把中文语音模型下载到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用浏览器自带识别（需要联网）。</p>
@@ -2016,6 +2009,7 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
           <div class="asrbar"><i id="asrBarFill"></i></div>
           <div class="asrerr" id="asrErr" hidden></div>
           <p class="asrhint" id="asrTip">下载期间不要关闭页面；完成后会把模型缓存到这台电脑，之后可离线使用。</p>
+          <div class="asrask-b" id="asrDoneRow" hidden><button class="primary" id="asrDone">完成</button></div>
           <div class="asrask-b" id="asrRetryRow" hidden>
             <button class="primary" id="asrRetry">重试</button>
             <button id="asrBackSrc">换个来源</button>
