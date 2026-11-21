@@ -499,7 +499,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1652";
+      window.__BUILD = "1121-1657";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1574,15 +1574,25 @@ async function handleFile(f){
     await delay(120);
     const parsed = parseScript(lines);
     if (!parsed.blocks.length) throw new Error("没解析到台词，检查「环节1：xx（0—4分钟）」和【说话人】");
+    $("pFill").style.width = "86%";
+    const aiOn = !!(document.getElementById("optAiCtrl") && document.getElementById("optAiCtrl").checked);
+    const title = aiOn ? "" : (extractTitle(lines) || f.name.replace(/\.[^.]+$/,"").trim());
+    setTitle(title, true);
+    pending = { lines, title };
+
+    // 勾了 AI：等标题真的生成出来，再结束加载动画（最长等 8 秒）
+    if (aiOn){
+      $("pState").textContent = "正在用 AI 生成标题…";
+      await Promise.race([
+        aiTitleFromLines(lines).catch(function(){}),
+        new Promise(function(r){ setTimeout(r, 8000); })
+      ]);
+    }
+
     $("pFill").style.width = "100%";
     const wait = Math.max(0, 620 - (performance.now() - t0));   // 让动画看得见，但不拖沓
     await delay(wait);
-    const aiOn = !!(document.getElementById("optAiCtrl") && document.getElementById("optAiCtrl").checked);
-  const title = aiOn ? "" : (extractTitle(lines) || f.name.replace(/\.[^.]+$/,"").trim());
-    setTitle(title, true);
-    pending = { lines, title };
     showDone(f.name, parsed);
-    if (aiOn){ try{ aiTitleFromLines(lines); }catch(_){} }   // 导入即用 AI 起标题
   } catch (err){
     showDropState();
     $("stat").innerHTML = "<b style='color:#d70015'>解析失败</b>　" + err.message;
