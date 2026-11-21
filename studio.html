@@ -416,6 +416,15 @@
     padding:5px 10px;font-size:12px;cursor:pointer;font-family:var(--font);transition:.15s;
   }
   .blkops button:hover{color:var(--blue);border-color:#c7d9f0}
+  /* 全文视图（跟读） */
+  .cues li.blkhead{
+    list-style:none;margin:22px 0 6px;padding:6px 2px;border-bottom:1px solid var(--line);
+    font-size:.82em;color:var(--ink-3);display:flex;gap:8px;align-items:baseline;
+  }
+  .cues li.blkhead .no{color:var(--blue);font-weight:600}
+  .cues li.blkhead b{color:var(--ink-2);font-weight:600}
+  .cues li.blkhead em{font-style:normal;color:var(--ink-3);font-size:.9em}
+  .cues li.allcue{margin:4px 0}
   /* 语音跟读 */
   #btnFollow.on{background:#0066cc;border-color:#0066cc;color:#fff}
   #cues li.fw{background:#fff;box-shadow:0 6px 22px rgba(18,46,92,.10)}
@@ -463,7 +472,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1522";
+      window.__BUILD = "1121-1528";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1091,7 +1100,7 @@ function render(){
   $("hName").textContent = b.name;
   $("hWin").textContent = b.win;
 
-  if (editing) renderEdit(); else renderRead();
+  if (editing) renderEdit(); else if (followView) renderAll(); else renderRead();
 
   $("cues").scrollTop = editing ? $("cues").scrollTop : 0;
   renderNav();
@@ -1099,6 +1108,23 @@ function render(){
   paintClock();
 }
 
+/* ---------- 全文视图（跟读模式：整份脚本一页到底） ---------- */
+function renderAll(){
+  const parts = [];
+  let gi = 0;
+  BLOCKS.forEach((b, bi0) => {
+    parts.push(`<li class="blkhead" data-bi="${bi0}"><span class="no">${b.no}</span><b>${esc(b.name)}</b><em>${esc(b.win || "")}</em></li>`);
+    b.cues.forEach((c, ci) => {
+      const sp = c[0], t = c[1];
+      const pair = SP[sp] || ["", ""];
+      const badge = pair[0] ? `<span class="${pair[1]}">${esc(pair[0])}</span>` : "";
+      const html = boldOn ? emphasize(esc(t)) : esc(t);
+      parts.push(`<li class="start allcue" data-gi="${gi}" data-bi="${bi0}" data-ci="${ci}"><div class="line">${badge}<span class="say">${html}</span></div></li>`);
+      gi++;
+    });
+  });
+  $("cues").innerHTML = parts.join("");
+}
 function renderRead(){
   const b = BLOCKS[bi];
   const cards = [];
@@ -1520,7 +1546,8 @@ function loadBlocks(blocks, key){
 }
 
 /* ================= 语音跟读（字面级定位，不依赖句意理解） ================= */
-const FLW = { on:false, rec:null, ptr:0, cue:-1, char:0, wait:0, pausedUntil:0, transcript:"" };
+const FLW = { on:false, rec:null, ptr:0, cue:-1, char:0, wait:0, pausedUntil:0, transcript:"", lastMoveAt:0, nextAt:0, farK:-1, farN:0 };
+let followView = false;
 let FW = null;
 
 function normText(s){ return String(s).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ""); }
@@ -1637,10 +1664,40 @@ function followLocate(text){
 }
 
 /* 把定位结果画到界面上 */
+/* 在某一 li 内按字数上色（两种视图共用） */
+function paintCueChars(li, item, ptr){
+  const done = Math.max(0, Math.min(ptr - item.start, item.len));
+  const raw = item.text;
+  let cut = 0, seen = 0;
+  for (; cut < raw.length; cut++){
+    if (/[\u4e00-\u9fa5A-Za-z0-9]/.test(raw[cut])){ if (seen === done) break; seen++; }
+  }
+  const pair = SP[item.sp] || ["", ""];
+  const badge = pair[0] ? `<span class="${pair[1]}">${esc(pair[0])}</span>` : "";
+  li.classList.add("fw");
+  li.innerHTML = `<div class="line">${badge}<span class="say"><span class="fc-done">${esc(raw.slice(0,cut))}</span><span class="fc-now">${esc(raw.slice(cut,cut+1))}</span><span class="fc-rest">${esc(raw.slice(cut+1))}</span></span></div>`;
+  FLW.char = done;
+}
 function followPaint(){
   const idx = FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)];
   const item = FW.list[idx];
   if (!item) return;
+
+  if (followView){
+    // 全文视图：只更新侧栏/计时器的当前板块，不重渲染，避免滚动位置丢失
+    if (item.bi !== bi){
+      bi = item.bi; left = BLOCKS[bi].dur; paintClock(); renderNav();
+    }
+    FLW.cue = idx;
+    const liA = document.querySelector(`#cues li[data-gi="${idx}"]`);
+    if (!liA) return;
+    paintCueChars(liA, item, FLW.ptr);
+    if (FLW.lastScrolledGi !== idx){
+      FLW.lastScrolledGi = idx;
+      followScrollTo(liA);
+    }
+    return;
+  }
 
   const blockChanged = item.bi !== bi;
   if (blockChanged){ go(item.bi); }
@@ -1686,6 +1743,22 @@ function followPaint(){
   }
 }
 
+/* 手动模式：在板块末尾继续向下滑，快捷进入下一板块 */
+let wheelLock = 0;
+$("cues").addEventListener("wheel", e => {
+  if (followView) return;
+  if (Date.now() < wheelLock) return;
+  const el = e.currentTarget;
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 6;
+  const atTop = el.scrollTop <= 4;
+  if (e.deltaY > 0 && atBottom){
+    wheelLock = Date.now() + 700;
+    if (bi < BLOCKS.length - 1) go(bi + 1);
+  } else if (e.deltaY < 0 && atTop){
+    wheelLock = Date.now() + 700;
+    if (bi > 0) go(bi - 1);
+  }
+}, { passive: true });
 /* ---------- 板块边界编辑：断开 / 合并 / 改名 / 改时长 ---------- */
 const CIRCLED_NUM = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
 const undoStack = [];
@@ -1903,6 +1976,7 @@ function stopFollow(){
   try{ localAsrStop(); }catch(_){}
   if (FLW.rec){ try { FLW.rec.onend = null; FLW.rec.stop(); } catch(_){} FLW.rec = null; }
   $("btnFollow").classList.remove("on");
+  try{ followView = false; render(); }catch(_){}
   $("btnFollow").textContent = "🎤 跟读";
   followStatus("");
   renderRead();
@@ -2201,6 +2275,7 @@ function localAsrStop(){
   LASR.ctx = null; LASR.node = null; LASR.buf = []; LASR.bufLen = 0;
 }
 function startFollow(){
+  try{ followView = true; if (!FW) followBuild(); render(); }catch(_){}
   const useLocal = /[?&]asr=local/.test(location.search) || asrPref() === "local";
   if (useLocal){
     FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
