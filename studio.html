@@ -330,21 +330,53 @@
   #setup .inner{animation:fadeUp .42s cubic-bezier(.2,.7,.2,1) both}
   @keyframes fadeUp{from{transform:translateY(10px)}to{transform:none}}
 
-  /* 本地识别下载询问 */
-  .asrask{
-    position:fixed;right:22px;bottom:22px;width:340px;background:#fff;border:1px solid var(--line);
-    border-radius:16px;padding:16px 18px;box-shadow:0 18px 48px rgba(18,46,92,.16);z-index:40;
+  /* 本地模型询问（居中 + 毛玻璃） */
+  .asrmask{
+    position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    background:rgba(245,245,247,.55);
+    -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+    opacity:0;pointer-events:none;transition:opacity .28s ease;
   }
-  .asrask[hidden]{display:none}
-  .asrask-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
-  .asrask-h b{font-size:13.5px}
-  .asrask-h span{font-size:11px;color:var(--ink-3)}
-  .asrask-p{margin:0 0 12px;font-size:12px;line-height:1.75;color:var(--ink-2)}
-  .asrask-b{display:flex;gap:8px}
-  .asrask-b button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .asrmask[hidden]{display:none}
+  .asrmask.on{opacity:1;pointer-events:auto}
+  .asrmodal{
+    width:min(440px,calc(100vw - 40px));background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:20px;
+    padding:22px 24px;box-shadow:0 30px 80px rgba(18,46,92,.18);
+    transform:translateY(10px) scale(.97);opacity:0;transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .24s ease;
+  }
+  .asrmask.on .asrmodal{transform:none;opacity:1}
+  .asrhead{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+  .asrhead b{font-size:15px}
+  .asrhead span{font-size:11.5px;color:var(--ink-3)}
+  .asrdesc{margin:0 0 14px;font-size:12.5px;line-height:1.8;color:var(--ink-2)}
+  .asrrow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .asrrow[hidden]{display:none}
+  .asrrow label{font-size:12px;color:var(--ink-3);min-width:64px}
+  .asrrow select,.asrrow input{
+    flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:12.5px;font-family:inherit;background:#fff;color:var(--ink);
+  }
+  .asrrow input:focus,.asrrow select:focus{outline:none;border-color:#b9d3f0;box-shadow:0 0 0 3px rgba(0,113,227,.10)}
+  .asrask-b{display:flex;gap:10px;margin-top:4px}
+  .asrask-b button{
+    flex:1;border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;font-size:13px;cursor:pointer;
+    font-family:inherit;color:var(--ink);transition:transform .16s ease,background .2s ease,border-color .2s ease,box-shadow .2s ease;
+  }
+  .asrask-b button:hover{border-color:#cfd7e3;background:#fafafc}
+  .asrask-b button:active{transform:scale(.985)}
   .asrask-b button.primary{background:#0066cc;border-color:#0066cc;color:#fff}
-  .asrask-f{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-3)}
-  .asrask-f input{margin-right:5px;vertical-align:-1px}
+  .asrask-b button.primary:hover{background:#0071e3;border-color:#0071e3}
+  .asrfoot{margin-top:12px;font-size:11.5px;color:var(--ink-3)}
+  .asrfoot input{margin-right:5px;vertical-align:-1px}
+  .asrbar{height:8px;border-radius:999px;background:#eef1f5;overflow:hidden;margin:4px 0 12px}
+  .asrbar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#0a84ff,#0066cc);transition:width .35s cubic-bezier(.2,.8,.2,1)}
+  .asrhint{margin:0;font-size:11.5px;line-height:1.7;color:var(--ink-3)}
+  .asrlist{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.9;color:var(--ink-2)}
+  .asrstep{animation:asrIn .26s cubic-bezier(.2,.8,.2,1) both}
+  .asrstep[hidden]{display:none}
+  @keyframes asrIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .asrmask,.asrmodal,.asrstep{transition:none;animation:none}
+  }
   /* 语音跟读 */
   #btnFollow.on{background:#0066cc;border-color:#0066cc;color:#fff}
   #cues li.fw{background:#fff;box-shadow:0 6px 22px rgba(18,46,92,.10)}
@@ -508,8 +540,10 @@
   </nav>
 
   <main class="stage">
-    <div class="asrask" id="asrAsk" hidden>
-      <div class="asrask-h"><b>本地离线识别</b><span>可选 · 约 40MB</span></div>
+
+        </div>
+      </div>
+    </div>
       <p class="asrask-p">开启后会下载一个中文语音模型到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用的是浏览器自带识别（需要联网）。</p>
       <div class="asrask-b">
         <button class="primary" id="asrYes">下载并启用</button>
@@ -1548,46 +1582,110 @@ function stopFollow(){
   renderRead();
 }
 
-/* ---------- 本地模型：进提词页时询问，用户同意才下载 ---------- */
+/* ---------- 本地模型：自检 → 需要时居中询问 → 同意后下载 ---------- */
 const ASR_PREF_KEY = "tyc_asr_pref";        // local | skip | never
 function asrPref(){ try { return localStorage.getItem(ASR_PREF_KEY) || ""; } catch(_){ return ""; } }
 function setAsrPref(v){ try { localStorage.setItem(ASR_PREF_KEY, v); } catch(_){} }
 
-function askLocalAsr(){
-  const bar = $("asrAsk");
-  if (!bar) return;
-  const pref = asrPref();
-  if (pref === "never"){ bar.hidden = true; return; }   // 只有勾了"不再提醒"才不再问；"暂不"下次进入仍会提醒
+/* 自检：浏览器缓存里是否已有 whisper 模型（下过一次就不再问） */
+async function hasCachedModel(){
+  try{
+    if (!("caches" in window)) return false;
+    const names = await caches.keys();
+    for (const n of names){
+      const c = await caches.open(n);
+      const keys = await c.keys();
+      for (const req of keys){
+        const u = req.url || "";
+        if (u.indexOf("whisper-tiny") >= 0 && (u.indexOf("encoder_model") >= 0 || u.indexOf("config.json") >= 0)) return true;
+      }
+    }
+  }catch(_){}
+  return false;
+}
 
-  const cached = !!(LASR && LASR.ready);
-  bar.hidden = false;
-  $("asrProg").textContent = cached ? "本机已缓存" : "";
+function asrModalOpen(open){
+  const mask = $("asrMask");
+  if (!mask) return;
+  if (open){
+    mask.hidden = false;
+    requestAnimationFrame(()=> mask.classList.add("on"));
+  } else {
+    mask.classList.remove("on");
+    setTimeout(()=>{ mask.hidden = true; }, 280);
+  }
+}
+function asrStepShow(n){
+  $("asrStep1").hidden = n !== 1;
+  $("asrStep2").hidden = n !== 2;
+  $("asrStep3").hidden = n !== 3;
+}
+
+async function askLocalAsr(){
+  const mask = $("asrMask");
+  if (!mask) return;
+  if (asrPref() === "never"){ return; }
+
+  // 已下载过：直接静默启用，不再弹窗
+  const cached = await hasCachedModel();
+  if (cached){
+    if (asrPref() !== "local") setAsrPref("local");
+    localAsrInit(function(){}, { silent:true });
+    return;
+  }
+
+  asrStepShow(1);
+  asrModalOpen(true);
+
+  const srcSel = $("asrSrc"), customRow = $("asrCustomRow"), hostInput = $("asrHost");
+  srcSel.onchange = () => { customRow.hidden = srcSel.value !== "custom"; };
 
   $("asrYes").onclick = () => {
-    setAsrPref("local");
-    $("asrProg").textContent = "准备下载…";
-    if ($("asrNever").checked) setAsrPref("never");
+    const source = srcSel.value;
+    const host = source === "custom" ? hostInput.value.trim() : "";
+    if (source === "custom" && !/^https?:\/\//.test(host)){
+      hostInput.focus();
+      hostInput.style.borderColor = "#e0a1a1";
+      return;
+    }
+    if ($("asrNever").checked) setAsrPref("never"); else setAsrPref("local");
+    asrStepShow(2);
+    $("asrBarFill").style.width = "2%";
+    $("asrPct").textContent = "0%";
+    $("asrFile").textContent = "连接下载源…";
+
     localAsrInit(function(){
-      $("asrProg").textContent = "已就绪，点 🎤 跟读即可";
-      setTimeout(()=>{ bar.hidden = true; }, 1200);
-    });
+      $("asrBarFill").style.width = "100%";
+      $("asrPct").textContent = "100%";
+      $("asrFile").textContent = "完成，可以开始跟读了";
+      setTimeout(()=>{ asrModalOpen(false); followStatus("本地识别就绪（离线）", false); }, 700);
+    }, { source, host, onProgress: (file, pct) => {
+      const p = Math.max(0, Math.min(100, Math.round(pct || 0)));
+      $("asrBarFill").style.width = p + "%";
+      $("asrPct").textContent = p + "%";
+      $("asrFile").textContent = "正在下载 " + (file || "");
+    }});
   };
-  $("asrNo").onclick = () => {
+
+  $("asrNo").onclick = () => asrStepShow(3);
+  $("asrBack").onclick = () => asrStepShow(1);
+  $("asrConfirmNo").onclick = () => {
     setAsrPref($("asrNever").checked ? "never" : "skip");
-    bar.hidden = true;
-    followStatus("本次使用浏览器识别；需要离线可重新加载页面再选下载", false);
+    asrModalOpen(false);
+    followStatus("本次使用浏览器识别；需要离线可刷新页面再选下载", false);
   };
 }
 /* ---------- 本地 ASR 引擎（whisper-tiny，离线，可选） ---------- */
 const LASR = { worker:null, ctx:null, node:null, ready:false, buf:[], bufLen:0, sr:16000, chunkSec:2.5, overlapSec:0.5, id:0 };
 
-function localAsrInit(done){
+function localAsrInit(done, opts){
+  opts = opts || {};
   if (LASR.ready){ done && done(); return; }
-  followStatus("加载本地模型…", false);
+  if (!opts.silent) followStatus("加载本地模型…", false);
   LASR.worker = new Worker("assets/asr/whisper-worker.js");
   LASR.worker.onmessage = e => {
     const d = e.data || {};
-    if (d.type === "progress") followStatus("加载模型 " + Math.round(d.pct || 0) + "%", false);
+    if (d.type === "progress"){ if (opts.onProgress) opts.onProgress(d.file, d.pct); }
     if (d.type === "ready"){ clearTimeout(LASR.guard); LASR.ready = true; followStatus("本地识别就绪（离线）", false); done && done(); }
     if (d.type === "error") followStatus("本地识别出错：" + d.message, true);
     if (d.type === "text"){
@@ -1600,7 +1698,7 @@ function localAsrInit(done){
     }
   };
   LASR.worker.onerror = ev => followStatus("本地模型加载失败：" + (ev.message || "worker error"), true);
-  LASR.worker.postMessage({ type:"init" });
+  LASR.worker.postMessage({ type:"init", source: opts.source || "mirror", host: opts.host || "" });
   clearTimeout(LASR.guard);
   LASR.guard = setTimeout(()=>{ if(!LASR.ready) followStatus("本地模型加载超时（网络或浏览器缓存问题），可先用默认模式", true); }, 90000);
 }
@@ -1797,5 +1895,50 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
   renderHist();
 })();
 </script>
+    <!-- 本地模型询问（居中模态） -->
+    <div class="asrmask" id="asrMask" hidden>
+      <div class="asrmodal" id="asrModal" role="dialog" aria-modal="true">
+        <div class="asrstep" id="asrStep1">
+          <div class="asrhead"><b>本地离线识别</b><span>可选 · 约 40MB</span></div>
+          <p class="asrdesc">开启后会把中文语音模型下载到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用浏览器自带识别（需要联网）。</p>
+
+          <div class="asrrow">
+            <label for="asrSrc">下载来源</label>
+            <select id="asrSrc">
+              <option value="mirror" selected>官方镜像 hf-mirror.com（推荐）</option>
+              <option value="local">站内自带（如有部署模型）</option>
+              <option value="custom">自定义地址…</option>
+            </select>
+          </div>
+          <div class="asrrow" id="asrCustomRow" hidden>
+            <label for="asrHost">自定义地址</label>
+            <input id="asrHost" placeholder="https://your-mirror.example.com" />
+          </div>
+
+          <div class="asrask-b">
+            <button class="primary" id="asrYes">下载并启用</button>
+            <button id="asrNo">暂不下载</button>
+          </div>
+          <div class="asrfoot"><label><input type="checkbox" id="asrNever" /> 以后不再提醒</label></div>
+        </div>
+
+        <div class="asrstep" id="asrStep2" hidden>
+          <div class="asrhead"><b>正在下载本地模型</b><span id="asrPct">0%</span></div>
+          <p class="asrdesc" id="asrFile">准备中…</p>
+          <div class="asrbar"><i id="asrBarFill"></i></div>
+          <p class="asrhint">下载期间不要关闭页面；完成后会把模型缓存到这台电脑，之后可离线使用。</p>
+        </div>
+
+        <div class="asrstep" id="asrStep3" hidden>
+          <div class="asrhead"><b>确定不下载？</b><span>随时可以再开</span></div>
+          <ul class="asrlist">
+            <li>跟读将使用<b>浏览器自带识别</b>，需要能连上它的语音服务（国内常被墙）。</li>
+            <li><b>断网时无法跟读</b>，只能手动翻页和计时。</li>
+            <li>识别延迟取决于网络，抖动大；本地模型则是稳定但慢约 3 秒。</li>
+          </ul>
+          <div class="asrask-b">
+            <button class="primary" id="asrBack">还是下载吧</button>
+            <button id="asrConfirmNo">确认暂不下载</button>
+          </div>
 </body>
 </html>
