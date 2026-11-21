@@ -374,6 +374,8 @@
     flex:1;border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--ink);
   }
   .asrrow input:focus,.asrrow select:focus{outline:none;border-color:#b9d3f0;box-shadow:0 0 0 3px rgba(0,113,227,.10)}
+  .asrquiet{display:flex;align-items:center;gap:8px;margin:2px 0 14px;font-size:13px;color:#6e6e73;cursor:pointer;user-select:none}
+  .asrquiet input{width:15px;height:15px;accent-color:#0071e3;cursor:pointer}
   .asrask-b{display:flex;gap:10px;margin-top:4px}
   .asrask-b button{
     flex:1;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px 14px;font-size:14px;cursor:pointer;
@@ -499,7 +501,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1657";
+      window.__BUILD = "1121-1702";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -2317,7 +2319,12 @@ async function aiAssignCtrl(){
 /* ---------- 本地模型：自检 → 需要时居中询问 → 同意后下载 ---------- */
 const ASR_PREF_KEY = "tyc_asr_pref";        // local | skip | never
 function asrPref(){ try { return localStorage.getItem(ASR_PREF_KEY) || ""; } catch(_){ return ""; } }
-function setAsrPref(v){ try { localStorage.setItem(ASR_PREF_KEY, v); } catch(_){} }
+function setAsrPref(v){
+  try{
+    if (v) localStorage.setItem(ASR_PREF_KEY, v);
+    else localStorage.removeItem(ASR_PREF_KEY);
+  }catch(_){}
+}
 
 /* 自检：浏览器缓存里是否已有 whisper 模型（下过一次就不再问） */
 async function hasCachedModel(){
@@ -2366,6 +2373,14 @@ async function askLocalAsr(){
   ASR_ASKED = true;
   if (asrPref() === "never"){ return; }
 
+  // 本机已勾选「不再提醒」：静默确认模型仍可用，然后一声不响地启用
+  if (SS.get("tyc_asr_quiet") === "1"){
+    const stillThere = await hasCachedModel();
+    if (stillThere){ setAsrPref("local"); localAsrInit(function(){}, { silent:true }); return; }
+    SS.del("tyc_asr_quiet");          // 模型被清掉了（换浏览器/清缓存）→ 恢复提醒
+    setAsrPref("");                   // 同时清掉"本地"偏好，避免误判成已就绪
+  }
+
   // 先给出"检测中"的可视反馈
   asrStepShow(0);
   asrModalOpen(true);
@@ -2374,12 +2389,17 @@ async function askLocalAsr(){
     hasCachedModel(),
     new Promise(r => setTimeout(r, 1600))     // 自检动画至少展示 1.6 秒
   ]);
-  const cached = choseLocal || findCache;
+  const cached = findCache;                 // 只认实际检测到的缓存，避免模型丢了还提示"已就绪"
   if (cached){
     if (!choseLocal) setAsrPref("local");
     $("asrReadyWhen").textContent = "已缓存";
     asrStepShow(4);
-    $("asrOK").onclick = () => { asrModalOpen(false); };
+    $("asrOK").onclick = () => {
+      const quiet = $("asrQuiet");
+      if (quiet && quiet.checked) SS.set("tyc_asr_quiet", "1");
+      else SS.del("tyc_asr_quiet");
+      asrModalOpen(false);
+    };
     localAsrInit(function(){}, { silent:true });
     return;
   }
@@ -2776,7 +2796,8 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
         </div>
         <div class="asrstep" id="asrStep4" hidden>
           <div class="asrhead"><b>本地模型已就绪</b><span id="asrReadyWhen"></span></div>
-          <p class="asrdesc">这台电脑上已经缓存了离线识别模型，断网也能跟读。之后不会再提醒。</p>
+          <p class="asrdesc">这台电脑上已经缓存了离线识别模型，断网也能跟读。</p>
+          <label class="asrquiet"><input type="checkbox" id="asrQuiet" checked /> 不再提醒（本机）</label>
           <div class="asrask-b"><button class="primary" id="asrOK">确定</button></div>
         </div>
         <div class="asrstep" id="asrStep1" hidden>
