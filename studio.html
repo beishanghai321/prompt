@@ -330,6 +330,21 @@
   #setup .inner{animation:fadeUp .42s cubic-bezier(.2,.7,.2,1) both}
   @keyframes fadeUp{from{transform:translateY(10px)}to{transform:none}}
 
+  /* 本地识别下载询问 */
+  .asrask{
+    position:fixed;right:22px;bottom:22px;width:340px;background:#fff;border:1px solid var(--line);
+    border-radius:16px;padding:16px 18px;box-shadow:0 18px 48px rgba(18,46,92,.16);z-index:40;
+  }
+  .asrask[hidden]{display:none}
+  .asrask-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .asrask-h b{font-size:13.5px}
+  .asrask-h span{font-size:11px;color:var(--ink-3)}
+  .asrask-p{margin:0 0 12px;font-size:12px;line-height:1.75;color:var(--ink-2)}
+  .asrask-b{display:flex;gap:8px}
+  .asrask-b button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .asrask-b button.primary{background:#0066cc;border-color:#0066cc;color:#fff}
+  .asrask-f{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-3)}
+  .asrask-f input{margin-right:5px;vertical-align:-1px}
   /* 语音跟读 */
   #btnFollow.on{background:#0066cc;border-color:#0066cc;color:#fff}
   #cues li.fw{background:#fff;box-shadow:0 6px 22px rgba(18,46,92,.10)}
@@ -493,6 +508,15 @@
   </nav>
 
   <main class="stage">
+    <div class="asrask" id="asrAsk" hidden>
+      <div class="asrask-h"><b>本地离线识别</b><span>可选 · 约 40MB</span></div>
+      <p class="asrask-p">开启后会下载一个中文语音模型到本机：<b>断网也能跟读</b>，代价是识别比在线慢（约 3 秒）。不下载也能用，用的是浏览器自带识别（需要联网）。</p>
+      <div class="asrask-b">
+        <button class="primary" id="asrYes">下载并启用</button>
+        <button id="asrNo">暂不下载</button>
+      </div>
+      <div class="asrask-f"><label><input type="checkbox" id="asrNever" /> 以后不再提醒</label><span id="asrProg"></span></div>
+    </div>
     <header class="head">
       <div class="ttl">
         <div class="num" id="hNum">①</div>
@@ -1257,7 +1281,7 @@ async function handleFile(f){
 
 /* 视图切换：淡出淡入，不硬跳 */
 function enterPrompter(){
-  setTimeout(()=>{ try{ followBuild(); }catch(_){} }, 60);
+  setTimeout(()=>{ try{ followBuild(); }catch(_){} try{ askLocalAsr(); }catch(_){} }, 60);
   $("setup").classList.add("leaving");
   setTimeout(()=>{
     $("setup").style.display = "none";
@@ -1524,6 +1548,36 @@ function stopFollow(){
   renderRead();
 }
 
+/* ---------- 本地模型：进提词页时询问，用户同意才下载 ---------- */
+const ASR_PREF_KEY = "tyc_asr_pref";        // local | skip | never
+function asrPref(){ try { return localStorage.getItem(ASR_PREF_KEY) || ""; } catch(_){ return ""; } }
+function setAsrPref(v){ try { localStorage.setItem(ASR_PREF_KEY, v); } catch(_){} }
+
+function askLocalAsr(){
+  const bar = $("asrAsk");
+  if (!bar) return;
+  const pref = asrPref();
+  if (pref === "never"){ bar.hidden = true; return; }   // 只有勾了"不再提醒"才不再问；"暂不"下次进入仍会提醒
+
+  const cached = !!(LASR && LASR.ready);
+  bar.hidden = false;
+  $("asrProg").textContent = cached ? "本机已缓存" : "";
+
+  $("asrYes").onclick = () => {
+    setAsrPref("local");
+    $("asrProg").textContent = "准备下载…";
+    if ($("asrNever").checked) setAsrPref("never");
+    localAsrInit(function(){
+      $("asrProg").textContent = "已就绪，点 🎤 跟读即可";
+      setTimeout(()=>{ bar.hidden = true; }, 1200);
+    });
+  };
+  $("asrNo").onclick = () => {
+    setAsrPref($("asrNever").checked ? "never" : "skip");
+    bar.hidden = true;
+    followStatus("本次使用浏览器识别；需要离线可重新加载页面再选下载", false);
+  };
+}
 /* ---------- 本地 ASR 引擎（whisper-tiny，离线，可选） ---------- */
 const LASR = { worker:null, ctx:null, node:null, ready:false, buf:[], bufLen:0, sr:16000, chunkSec:2.5, overlapSec:0.5, id:0 };
 
@@ -1586,7 +1640,7 @@ function localAsrStop(){
   LASR.ctx = null; LASR.node = null; LASR.buf = []; LASR.bufLen = 0;
 }
 function startFollow(){
-  const useLocal = /[?&]asr=local/.test(location.search);
+  const useLocal = /[?&]asr=local/.test(location.search) || asrPref() === "local";
   if (useLocal){
     FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
     $("btnFollow").classList.add("on");
