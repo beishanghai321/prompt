@@ -490,7 +490,7 @@
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1539";
+      window.__BUILD = "1121-1542";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1148,8 +1148,7 @@ function nextTextFor(bi0){
   const nb = BLOCKS[bi0 + 1];
   if (!nb) return "时间到归零，回到 ① 重新开始下一轮。";
   const first = String(nb.cues[0] ? nb.cues[0][1] : "");
-  const short = first.length > 46 ? first.slice(0, 46) + "…" : first;
-  return "下一块【" + nb.name + "】" + (nb.win || "") + "：" + short;
+  return first.length > 60 ? first.slice(0, 60) + "…" : first;
 }
 function renderRead(){
   const b = BLOCKS[bi];
@@ -1272,19 +1271,27 @@ function paintClock(){
     : (running ? "计时中 · 到点切板块" : "剩余时间 · 空格开始");
 }
 
+/* 切板块后回到第一句 */
+function resetScrollTop(){
+  const box = $("cues");
+  if (!box) return;
+  box.scrollTop = 0;
+  try{ box.scrollTo({ top: 0, behavior: "auto" }); }catch(_){}
+}
 /* ---------- 切板块：丝滑过渡 ---------- */
 function goSmooth(idx){
   const target = (idx + BLOCKS.length) % BLOCKS.length;
   if (target === bi){ go(idx); return; }
   if (document.startViewTransition){
     document.startViewTransition(() => { go(idx); });
+    setTimeout(resetScrollTop, 60);
     return;
   }
   const box = $("cues");
   box.classList.add("switching");
-  setTimeout(() => { go(idx); requestAnimationFrame(() => box.classList.remove("switching")); }, 140);
+  setTimeout(() => { go(idx); resetScrollTop(); requestAnimationFrame(() => box.classList.remove("switching")); }, 140);
 }
-function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); if (running) tickStart(); }
+function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); resetScrollTop(); if (running) tickStart(); }
 function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ left -= 1; paintClock(); }, 1000); }
 function toggle(){ running = !running; if (running) tickStart(); else clearInterval(timer); paintClock(); }
 function reset(){ left = BLOCKS[bi].dur; paintClock(); }
