@@ -507,8 +507,11 @@ html.auth-pending{background:#fff}
   if (isDev) return;
   document.documentElement.classList.add("auth-pending");
   var go = function(ok){
-    if (ok) document.documentElement.classList.remove("auth-pending");
-    else location.replace("index.html?needLogin=1");
+    if (ok){ document.documentElement.classList.remove("auth-pending"); }
+    else {
+      try{ sessionStorage.removeItem("tyc_auth"); }catch(_){}
+      location.replace("index.html?needLogin=1");
+    }
   };
   try{
     fetch("/api/session", { cache: "no-store" })
@@ -529,7 +532,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1121-1756";
+      window.__BUILD = "1121-1800";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");

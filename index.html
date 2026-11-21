@@ -561,8 +561,27 @@ document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
   mask.addEventListener("click", e => { if (e.target === mask) closeLogin(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && mask.classList.contains("on")) closeLogin(); });
 
-  // 从工作台被弹回来时，直接弹登录窗
-  if (/[?&]needLogin=1/.test(location.search)) openLogin();
+  // 载入时静默校验一次（不打扰用户），修正本地"已登录"标记
+  (async () => {
+    if (isDev) return;
+    try{
+      const r = await fetch("/api/session", { cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (d && d.authed){
+        sessionStorage.setItem("tyc_auth","1");
+        sessionStorage.setItem("tyc_role", d.role || "owner");
+        sessionStorage.setItem("tyc_ai_left", String(d.aiLeft == null ? 999 : d.aiLeft));
+      } else {
+        sessionStorage.removeItem("tyc_auth");
+      }
+    }catch(_){}
+  })();
+
+  // 从工作台被弹回来时，直接弹登录窗（并把参数从地址栏抹掉，避免返回时反复弹）
+  if (/[?&]needLogin=1/.test(location.search)){
+    openLogin();
+    try{ history.replaceState(null, "", location.pathname + location.hash); }catch(_){}
+  }
 })();
 </script></body>
 </html>
