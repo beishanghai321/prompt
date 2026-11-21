@@ -330,6 +330,12 @@
   #setup .inner{animation:fadeUp .42s cubic-bezier(.2,.7,.2,1) both}
   @keyframes fadeUp{from{transform:translateY(10px)}to{transform:none}}
 
+  /* 语音跟读 */
+  #btnFollow.on{background:#0066cc;border-color:#0066cc;color:#fff}
+  #cues li.fw{background:#fff;box-shadow:0 6px 22px rgba(18,46,92,.10)}
+  #cues li.fw .fc-done{color:#1d1d1f}
+  #cues li.fw .fc-now{background:#fff1a8;border-radius:3px;box-shadow:0 -2px 0 #fff1a8 inset}
+  #cues li.fw .fc-rest{color:#b9b9c0}
   .editbar{display:flex;align-items:center;gap:6px;margin-left:10px}
   .editbar button{
     font-family:var(--font);font-size:12px;font-weight:500;color:var(--ink-2);
@@ -504,6 +510,7 @@
         <button id="fsUp" title="放大字号（=）">A+</button>
       </div>
       <div class="editbar">
+        <button id="btnFollow" title="语音跟读：念到哪，高亮跟到哪">🎤 跟读</button>
         <button id="btnEdit" title="修改台词">编辑</button>
         <button id="btnSave" title="保存到本机">保存</button>
         <span class="savehint" id="saveHint"></span>
@@ -748,7 +755,10 @@ function isPersonName(n){
   if (n.length < 2 || n.length > 6) return false;
   if (NOT_NAME.has(n) || /^\d+$/.test(n) || NAME_BAD.test(n)) return false;
   if (ROLE_TAIL.test(n)) return true;
-  return (COLON_NAMES.get(n) || 0) >= 2;          // 没有角色后缀，但反复出现，认它是人名
+  if ((COLON_NAMES.get(n) || 0) >= 2) return true;   // 反复出现的短名字
+  if (!/^[\u4e00-\u9fa5A-Za-z·]+$/.test(n)) return false;     // 带符号/emoji 的不是名字
+  if (/^(吃法|用法|用量|提醒|注意|建议|重点|总结|步骤|方法|福利|价格|活动|机制|产品|人群|禁忌|搭配|保存|功效|成分|时间|地点|备注|说明)/.test(n)) return false;
+  return n.length >= 2 && n.length <= 4;             // 2—4 字的短名字
 }
 
 function detectSpeaker(line){
@@ -910,9 +920,9 @@ function render(){
 function renderRead(){
   const b = BLOCKS[bi];
   const cards = [];
-  b.cues.forEach(([sp,t]) => {
+  b.cues.forEach(([sp,t], ci) => {
     const lines = segment(t).map((part,i) => ({ sp: i === 0 ? sp : null, html: boldOn ? emphasize(part) : esc(part) }));
-    cards.push({ lines, special:false });
+    cards.push({ lines, special:false, ci });
   });
   cards.push({ lines:[{ sp:"go",  html: esc(b.next) }], special:true });
   if (b.ctrl) cards.push({ lines:[{ sp:"ctl", html: esc(b.ctrl) }], special:true });
@@ -930,7 +940,7 @@ function renderRead(){
       }
       return `<div class="line">${badge}<span class="say">${ln.html}</span></div>`;
     }).join("");
-    return `<li class="${c.special ? "special" : "start"}">${inner}</li>`;
+    return `<li class="${c.special ? "special" : "start"}"${c.special ? "" : ` data-ci="${c.ci}"`}>${inner}</li>`;
   }).join("");
 }
 
@@ -1105,7 +1115,11 @@ function saveHist(lines, title){
     blockCount: BLOCKS.length, cues: BLOCKS.reduce((n,b)=> n + b.cues.length, 0)
   };
   const i = arr.findIndex(x => x.id === key);
-  if (i >= 0){ rec.date = arr[i].date; arr.splice(i,1); }
+  if (i >= 0){
+    rec.date = arr[i].date;
+    if (arr[i].blocks) rec.blocks = arr[i].blocks;   // 同一份脚本再次生成时，保留之前编辑过的内容
+    arr.splice(i,1);
+  }
   arr.unshift(rec);
   if (arr.length > 30) arr.length = 30;
   setHist(arr);
@@ -1133,12 +1147,13 @@ function renderHist(){
     const rec = getHist().find(x => x.id === el.dataset.id);
     el.onclick = e => {
       if (e.target.classList.contains("del")) return;
-      if (!rec) return;
+      const fresh = getHist().find(x => x.id === el.dataset.id) || rec;   // 取最新的，避免用到渲染时的旧快照
+      if (!fresh) return;
       $("optTitle").value = rec.title || "";
       $("optLen").value = rec.len || 52;
       $("optBold").checked = rec.bold !== false;
-      if (rec.blocks && rec.blocks.length){ loadBlocks(rec.blocks, rec.id); }
-      else { generate(rec.lines); }
+      if (fresh.blocks && fresh.blocks.length){ loadBlocks(fresh.blocks, fresh.id); }
+      else { generate(fresh.lines); }
     };
     el.querySelector(".del").onclick = e => {
       e.stopPropagation();
@@ -1242,6 +1257,7 @@ async function handleFile(f){
 
 /* 视图切换：淡出淡入，不硬跳 */
 function enterPrompter(){
+  setTimeout(()=>{ try{ followBuild(); }catch(_){} }, 60);
   $("setup").classList.add("leaving");
   setTimeout(()=>{
     $("setup").style.display = "none";
@@ -1251,6 +1267,7 @@ function enterPrompter(){
   }, 230);
 }
 function leavePrompter(){
+  try{ if (FLW.on) stopFollow(); }catch(_){}
   $("prompter").classList.remove("shown");
   setTimeout(()=>{
     $("prompter").classList.remove("on");
@@ -1294,6 +1311,180 @@ function loadBlocks(blocks, key){
   enterPrompter();
 }
 
+/* ================= 语音跟读（字面级定位，不依赖句意理解） ================= */
+const FLW = { on:false, rec:null, ptr:0, cue:-1, char:0, wait:0, pausedUntil:0, transcript:"" };
+let FW = null;
+
+function normText(s){ return String(s).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ""); }
+
+/* 把当前脚本压成字符流，建 2/3-gram 倒排 */
+function followBuild(){
+  FW = { stream:"", owner:[], list:[], g2:new Map(), g3:new Map(), idf:new Map() };
+  BLOCKS.forEach((b, bi) => b.cues.forEach((c, ci) => {
+    const s = normText(c[1]);
+    const idx = FW.list.length;
+    FW.list.push({ bi, ci, sp:c[0], text:c[1], start: FW.stream.length, len: s.length });
+    for (let i = 0; i < s.length; i++) FW.owner.push(idx);
+    FW.stream += s;
+  }));
+  const st = FW.stream;
+  for (let i = 0; i + 2 < st.length; i++){ const k = st.substr(i,3); let a = FW.g3.get(k); if (!a){ a = []; FW.g3.set(k,a); } if (a.length < 300) a.push(i); }
+  for (let i = 0; i + 1 < st.length; i++){ const k = st.substr(i,2); let a = FW.g2.get(k); if (!a){ a = []; FW.g2.set(k,a); } if (a.length < 500) a.push(i); }
+  for (const ch of st) FW.idf.set(ch, (FW.idf.get(ch) || 0) + 1);
+  for (const [ch, c] of FW.idf) FW.idf.set(ch, Math.log(1 + st.length / c));
+  FLW.ptr = 0; FLW.cue = -1; FLW.char = 0;
+}
+
+function fwScoreAt(k, tail){
+  if (k < 0 || k >= FW.stream.length) return -1e9;
+  let best = -1e9;
+  for (let shift = -2; shift <= 2; shift++){
+    const kk = k + shift;
+    if (kk < 0) continue;
+    const len = Math.min(tail.length, FW.stream.length - kk);
+    if (len <= 0) continue;
+    let m = 0;
+    for (let i = 0; i < len; i++) if (FW.stream[kk + i] === tail[i]) m++;
+    const sc = m / tail.length - (tail.length - len) * 0.5;
+    if (sc > best) best = sc;
+  }
+  return best;
+}
+function fwBagAt(k, tail){
+  const from = Math.max(0, k - 3), to = Math.min(FW.stream.length, k + tail.length + 3);
+  const bag = new Map();
+  for (let i = from; i < to; i++){ const ch = FW.stream[i]; bag.set(ch, (bag.get(ch) || 0) + 1); }
+  let hit = 0, total = 0;
+  for (const ch of tail){
+    const w = FW.idf.get(ch) || 1; total += w;
+    const c = bag.get(ch) || 0;
+    if (c > 0){ hit += w; bag.set(ch, c - 1); }
+  }
+  return total ? hit / total : 0;
+}
+
+function fwCandidates(tail){
+  const votes = new Map();
+  const add = (p, w) => votes.set(p, (votes.get(p) || 0) + w);
+  for (let i = 0; i + 2 < tail.length; i++){
+    const arr = FW.g3.get(tail.substr(i,3));
+    if (arr) for (const p of arr) add(p - i, 3);
+  }
+  for (let i = 0; i + 1 < tail.length; i++){
+    const arr = FW.g2.get(tail.substr(i,2));
+    if (arr) for (const p of arr) add(p - i, 2);
+  }
+  const list = [...votes.entries()].sort((a,b)=> b[1]-a[1]).slice(0,60).map(x=>x[0]);
+  for (let d = -25; d <= 45; d += 5) list.push(FLW.ptr + d);
+  return [...new Set(list)].filter(k => k >= 0 && k < FW.stream.length);
+}
+
+/* 一次定位：返回 {pos, conf}；置信不够就原地不动 */
+function followLocate(text){
+  const clean = normText(text);
+  const tail = clean.slice(-18);
+  if (tail.length < 4 || !FW) return { pos: FLW.ptr, conf: 0 };
+
+  const g2 = new Set();
+  for (let i = 0; i + 1 < tail.length; i++){ const g = tail.substr(i,2); if (FW.g2.has(g)) g2.add(g); }
+
+  let bestK = -1, best = -1e9;
+  for (const k of fwCandidates(tail)){
+    const seq = fwScoreAt(k, tail), bag = fwBagAt(k, tail);
+    let sc = 0.65 * seq + 0.35 * bag;
+    const dist = Math.abs(k - FLW.ptr);
+    if (dist <= 40) sc += 0.05;
+    let need = 0.45;
+    if (dist > 25) need = 0.58;
+    if (dist > 120) need = (g2.size >= 7 ? 0.58 : 0.70);
+    if (dist > 120 && g2.size < 5) continue;
+    if (sc < need) continue;
+    if (sc > best){ best = sc; bestK = k; }
+  }
+  if (bestK < 0) return { pos: FLW.ptr, conf: 0 };
+
+  let pos = Math.min(FW.stream.length - 1, bestK + tail.length);
+  const idx = FW.owner[Math.min(bestK, FW.owner.length - 1)];
+  const item = FW.list[idx];
+  const end = item.start + item.len;
+  if (bestK < end - 4) pos = Math.min(pos, end + 2);      // 不许提前顶进下一句
+  return { pos, conf: Math.min(1, best) };
+}
+
+/* 把定位结果画到界面上 */
+function followPaint(){
+  const idx = FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)];
+  const item = FW.list[idx];
+  if (!item) return;
+
+  if (item.bi !== bi){ go(item.bi); }
+  if (idx !== FLW.cue){
+    FLW.cue = idx;
+    renderRead();
+    const li = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
+    if (li) li.scrollIntoView({ block:"center", behavior:"smooth" });
+  }
+  const li = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
+  if (!li) return;
+
+  const done = Math.max(0, Math.min(FLW.ptr - item.start, item.len));
+  const raw = item.text;
+  let cut = 0, seen = 0;
+  for (; cut < raw.length; cut++){
+    if (/[\u4e00-\u9fa5A-Za-z0-9]/.test(raw[cut])){ if (seen === done) break; seen++; }
+  }
+  const pair = SP[item.sp] || ["", ""];
+  const badge = pair[0] ? `<span class="${pair[1]}">${esc(pair[0])}</span>` : "";
+  li.classList.add("fw");
+  li.innerHTML = `<div class="line">${badge}<span class="say"><span class="fc-done">${esc(raw.slice(0,cut))}</span><span class="fc-now">${esc(raw.slice(cut,cut+1))}</span><span class="fc-rest">${esc(raw.slice(cut+1))}</span></span></div>`;
+  FLW.char = done;
+}
+
+function followStatus(msg, warn){
+  const el = $("saveHint");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.style.color = warn ? "#a8630a" : "var(--ink-3)";
+}
+
+function stopFollow(){
+  FLW.on = false;
+  if (FLW.rec){ try { FLW.rec.onend = null; FLW.rec.stop(); } catch(_){} FLW.rec = null; }
+  $("btnFollow").classList.remove("on");
+  $("btnFollow").textContent = "🎤 跟读";
+  followStatus("");
+  renderRead();
+}
+
+function startFollow(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ followStatus("这个浏览器没有语音识别（用 Chrome / Edge）", true); return; }
+  if (!FW) followBuild();
+  FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
+  $("btnFollow").classList.add("on");
+  $("btnFollow").textContent = "■ 停止";
+
+  const rec = new SR();
+  rec.lang = "zh-CN"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+  rec.onresult = e => {
+    if (Date.now() < FLW.pausedUntil) return;          // 手动操作后暂停 3 秒
+    let txt = "";
+    for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+    FLW.transcript = txt;
+    const r = followLocate(txt);
+    if (r.conf >= 0.45){ FLW.ptr = r.pos; followPaint(); followStatus("跟读中 · 置信 " + Math.round(r.conf * 100) + "%"); }
+    else { followStatus("待命 · 没对上脚本（脱稿或识音不准）", true); }
+  };
+  rec.onerror = ev => {
+    const m = { "not-allowed":"麦克风被拒绝：地址栏左侧图标里改成允许", "network":"连不上语音服务（Chrome 走 Google，国内常被挡）", "no-speech":"没听到声音", "audio-capture":"找不到麦克风" };
+    followStatus(m[ev.error] || ("识别出错：" + ev.error), true);
+  };
+  rec.onend = () => { if (FLW.on){ try { rec.start(); } catch(_){} } };
+  try { rec.start(); } catch(err){ followStatus("启动失败：" + err.message, true); }
+  FLW.rec = rec;
+}
+
+$("btnFollow").onclick = () => { if (FLW.on) stopFollow(); else startFollow(); };
 /* 侧边栏收起 / 展开 */
 function setRail(collapsed){
   $("rail").classList.toggle("collapsed", collapsed);
