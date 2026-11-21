@@ -1397,6 +1397,7 @@ function followLocate(text){
     // 双人脚本：同说话人优先；抢话时"还没念过的句子"优先
     const hit = FW.list[FW.owner[Math.min(k, FW.owner.length - 1)]];
     const curItem = FW.list[FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)]];
+    if (hit && curItem && hit.bi === curItem.bi) sc += 0.05;                 // 同板块优先，跨段要更强证据
     if (hit && curItem && hit.sp && hit.sp === curItem.sp) sc += 0.04;
     if (hit && FW.list.indexOf(hit) > FW.list.indexOf(curItem)) sc += 0.02;
     let need = 0.45;
@@ -1409,10 +1410,14 @@ function followLocate(text){
   if (bestK < 0) return { pos: FLW.ptr, conf: 0 };
 
   let pos = Math.min(FW.stream.length - 1, bestK + tail.length);
-  const idx = FW.owner[Math.min(bestK, FW.owner.length - 1)];
-  const item = FW.list[idx];
+  const hitIdx = FW.owner[Math.min(bestK, FW.owner.length - 1)];
+  const item = FW.list[hitIdx];
+  const curItem = FW.list[FW.owner[Math.min(FLW.ptr, FW.owner.length - 1)]];
   const end = item.start + item.len;
-  if (bestK < end - 4) pos = Math.min(pos, end + 2);      // 不许提前顶进下一句
+  // 只有「这一句还没念完」时才限制越界；跨段/跨句直接放行，避免先停在上一段末尾再二次纠正
+  const sameBlock = curItem && item.bi === curItem.bi;
+  const tailStaysInCue = (bestK + tail.length) <= end + 3;
+  if (sameBlock && tailStaysInCue && bestK < end - 3) pos = Math.min(pos, end);
   return { pos, conf: Math.min(1, best) };
 }
 
@@ -1422,12 +1427,13 @@ function followPaint(){
   const item = FW.list[idx];
   if (!item) return;
 
-  if (item.bi !== bi){ go(item.bi); }
-  if (idx !== FLW.cue){
+  const blockChanged = item.bi !== bi;
+  if (blockChanged){ go(item.bi); }
+  if (blockChanged || idx !== FLW.cue){
     FLW.cue = idx;
     renderRead();
-    const li = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
-    if (li) li.scrollIntoView({ block:"center", behavior:"smooth" });
+    const li0 = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
+    if (li0) li0.scrollIntoView({ block:"center", behavior:"smooth" });
   }
   const li = document.querySelector(`#cues li[data-ci="${item.ci}"]`);
   if (!li) return;
