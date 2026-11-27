@@ -473,18 +473,20 @@ html.auth-pending{background:#fff}
 
   .stage{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;padding:22px 34px 0}
   .head{
-    display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;width:100%;max-width:1400px;margin:0 auto;
+    display:grid;grid-template-columns:1fr auto;grid-template-areas:"clock clock" "ttl tools";align-items:end;row-gap:8px;column-gap:16px;
+    width:100%;max-width:1400px;margin:0 auto;
     padding-bottom:14px;border-bottom:1px solid var(--line);flex:0 0 auto;
   }
-  .head .ttl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+
+  .head .ttl{grid-area:ttl;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;justify-self:start}
   .head .num{font-size:clamp(24px,3.4vh,40px);font-weight:600;color:var(--blue);letter-spacing:-.02em;line-height:1}
   .head h1{font-size:clamp(20px,2.9vh,32px);font-weight:600;letter-spacing:-.02em;color:var(--ink)}
   .head .win{
     font-size:clamp(11px,1.4vh,14px);color:var(--blue);font-weight:500;
     background:var(--blue-soft);border-radius:980px;padding:5px 12px;white-space:nowrap;
   }
-  .clock{text-align:center;min-width:120px;margin:0 auto}
-  .head .toolbar{display:flex;align-items:flex-end;gap:10px;margin-left:auto}
+  .clock{grid-area:clock;justify-self:center;text-align:center;min-width:150px;margin:0}
+  .head .toolbar{grid-area:tools;display:flex;align-items:center;gap:10px;justify-self:end}
   .clock .t{
     font-variant-numeric:tabular-nums;font-size:clamp(22px,3.4vh,40px);font-weight:600;letter-spacing:-.01em;
     font-feature-settings:"tnum";color:var(--ink);line-height:1;
@@ -496,8 +498,8 @@ html.auth-pending{background:#fff}
   .clock .hint{font-size:10.5px;color:var(--ink-3);margin-top:6px;letter-spacing:.02em}
 
   .fsbar{
-    display:flex;align-items:center;gap:2px;margin-left:10px;background:var(--surface-2);
-    border:1px solid var(--line);border-radius:980px;padding:3px 4px;font-size:12px;color:var(--ink-3);
+    display:flex;align-items:center;gap:1px;margin-left:8px;flex:0 0 auto;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:980px;padding:3px 4px;font-size:11.5px;color:var(--ink-3);
   }
   .fsbar button{
     font-family:var(--font);font-size:14px;font-weight:500;color:var(--ink-2);background:transparent;
@@ -705,7 +707,7 @@ html.auth-pending{background:#fff}
   }
   @keyframes swipeNudge{0%,100%{transform:translateY(0) rotate(45deg);opacity:.55}50%{transform:translateY(5px) rotate(45deg);opacity:1}}
   /* 全文视图：顶部只留计时，避免和正文里的板块标题重复 */
-  body.allview .head .ttl{display:none}
+  body.allview .head .ttl{visibility:hidden}   /* 占位，保证计时居中 */
   body.allview .head{justify-content:flex-end}
   /* 全文视图（跟读） */
   .cues li.blkhead{
@@ -722,11 +724,12 @@ html.auth-pending{background:#fff}
   #cues li.fw .fc-done{color:#1d1d1f}
   #cues li.fw .fc-now{background:#fff1a8;border-radius:3px;box-shadow:0 -2px 0 #fff1a8 inset}
   #cues li.fw .fc-rest{color:#b9b9c0}
-  .editbar{display:flex;align-items:center;gap:6px;margin-left:10px}
+  .editbar{display:flex;align-items:center;gap:5px;margin-left:8px;flex:0 0 auto}
+  .editbar button{flex:0 0 auto;white-space:nowrap}
   .editbar button{
-    font-family:var(--font);font-size:15px;font-weight:500;color:var(--ink-2);
+    font-family:var(--font);font-size:13.5px;font-weight:500;color:var(--ink-2);
     background:var(--surface-2);border:1px solid var(--line);border-radius:980px;
-    padding:7px 16px;cursor:pointer;transition:.16s;
+    padding:7px 12px;cursor:pointer;transition:.16s;
   }
   .editbar button:hover{color:var(--blue);border-color:#c7d9f0;background:#fff}
   .editbar button.on{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -792,7 +795,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1050";
+      window.__BUILD = "1127-1055";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1600,13 +1603,13 @@ function setEditing(on){
 function paintClock(){
   const b = BLOCKS[bi];
   const t = $("clockT"), bar = $("clockBar");
-  if (followView){                                   // 跟读：总计时，从 0 往上走
+  if (followView || allView){                        // 全文/跟读：全局正计时，从 0 往上走
     const sec = Math.max(0, Math.floor((Date.now() - (FW_START || Date.now())) / 1000));
     t.textContent = fmt(sec);
     t.className = "t";
     bar.style.width = "100%";
     $("flash").className = "flash";
-    $("clockHint").textContent = "跟读中 · 全场已用时";
+    $("clockHint").textContent = (followView ? "跟读中" : "全程") + " · 已用时";
     return;
   }
   t.textContent = left >= 0 ? fmt(left) : "-" + fmt(-left);
@@ -1649,7 +1652,7 @@ function goSmooth(idx){
   }, 120);
 }
 function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); resetScrollTop(); if (running) tickStart(); }
-function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ left -= 1; paintClock(); }, 1000); }
+function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ if (allView || followView){ paintClock(); return; } left -= 1; paintClock(); }, 1000); }
 function toggle(){ running = !running; if (running) tickStart(); else clearInterval(timer); paintClock(); }
 function reset(){ left = BLOCKS[bi].dur; paintClock(); }
 
@@ -1923,6 +1926,7 @@ async function handleFile(f){
 let pushedPrompter = false;
 function enterPrompter(){
   try{ applyGuestLimits(); }catch(_){}
+  try{ if (allView){ startGlobalClock(); } }catch(_){}
   try{ if ($("acctBtn")) $("acctBtn").style.display = "none"; }catch(_){}
   try{ paintAccount(); }catch(_){}
   // 每次进入都重置：第一块、全文视图、滚动到顶
@@ -3197,6 +3201,16 @@ function applyGuestLimits(){
   }
 
   updateGuestTip();
+}
+/* 全文视图：全局正计时（从 0 开始） */
+function startGlobalClock(){
+  if (!FW_START) FW_START = Date.now();
+  clearInterval(fwClockTimer);
+  fwClockTimer = setInterval(paintClock, 1000);
+  paintClock();
+}
+function stopGlobalClock(){
+  clearInterval(fwClockTimer); fwClockTimer = null; FW_START = 0;
 }
 /* ---------- 视图切换：全文 <-> 分块 ---------- */
 function applyViewLabel(){
