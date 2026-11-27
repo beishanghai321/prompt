@@ -795,7 +795,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1101";
+      window.__BUILD = "1127-1104";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1659,6 +1659,7 @@ function toggle(){
 }
 function reset(){
   if (allView || followView){ resetGlobalClock(); return; }
+  clearInterval(timer); running = false;      // 归零后自动暂停
   left = BLOCKS[bi].dur; paintClock();
 }
 
@@ -3228,7 +3229,8 @@ function pauseGlobalClock(){
 }
 function resetGlobalClock(){
   GLOBAL_ACC = 0;
-  if (GLOBAL_RUN) FW_START = Date.now(); else FW_START = 0;
+  GLOBAL_RUN = false; FW_START = 0;          // 归零后自动暂停
+  clearInterval(fwClockTimer); fwClockTimer = null;
   paintClock();
 }
 function stopGlobalClock(){
