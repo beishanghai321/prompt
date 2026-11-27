@@ -799,7 +799,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1558";
+      window.__BUILD = "1127-1624";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1573,6 +1573,26 @@ function onEditInput(e){
   else if (el.dataset.kind === "ctrl") b.ctrl = val;
   scheduleSave();
 }
+let hintTimer = 0;
+function setHint(txt, color, revertMs){
+  clearTimeout(hintTimer);
+  const el = $("saveHint");
+  if (!el) return;
+  el.textContent = txt || "";
+  el.style.color = color || "var(--ink-3)";
+  if (revertMs) hintTimer = setTimeout(() => { el.textContent = ""; el.style.color = "var(--ink-3)"; }, revertMs);
+}
+function hintEditingStart(){
+  const el = $("saveHint");
+  clearTimeout(hintTimer);
+  if (el){ el.textContent = "正在修改 · 点保存生效"; el.style.color = "#a8630a"; }
+}
+function hintDirty(){
+  const el = $("saveHint");
+  clearTimeout(hintTimer);
+  if (el){ el.textContent = "改动未保存 · 点保存生效"; el.style.color = "#a8630a"; }
+}
+
 function scheduleSave(){
   clearTimeout(saveTimer);
   $("saveHint").textContent = "改动待保存…";
@@ -1594,8 +1614,7 @@ function saveNow(manual){
   SS.set("tyc_blocks", JSON.stringify({ key: currentKey, blocks: snap }));
   const t = new Date();
   const hh = String(t.getHours()).padStart(2,"0"), mm = String(t.getMinutes()).padStart(2,"0");
-  $("saveHint").textContent = (manual ? "已保存 " : "已自动保存 ") + hh + ":" + mm;
-  $("saveHint").style.color = "var(--ink-3)";
+  setHint((manual ? "已保存 " : "已自动保存 ") + hh + ":" + mm, "var(--ink-3)", 2600);
 }
 
 function setEditing(on){
@@ -3231,8 +3250,7 @@ function startInline(li){
     const sel = window.getSelection();
     sel.removeAllRanges(); sel.addRange(r);
   }catch(_){}
-  $("saveHint").textContent = "正在修改 · 记得点保存";
-  $("saveHint").style.color = "#a8630a";
+  hintEditingStart();
 }
 
 function commitInline(){
@@ -3256,8 +3274,7 @@ function commitInline(){
   requestAnimationFrame(() => {
     const li2 = document.querySelector(keep.gi >= 0 ? `#cues li[data-gi="${keep.gi}"]` : `#cues li[data-ci="${keep.ci}"]`);
     if (li2) li2.scrollIntoView({ block: "center", behavior: "auto" });
-    $("saveHint").textContent = "已保存修改";
-    $("saveHint").style.color = "var(--ink-3)";
+    setHint("已保存修改", "var(--ink-3)", 2400);
   });
   return true;
 }
@@ -3282,17 +3299,28 @@ $("cues").addEventListener("click", e => {
   }
   lastTap = { t: now, li };
 });
+$("cues").addEventListener("focusout", e => {
+  if (!INL) return;
+  const li = e.target && e.target.closest && e.target.closest("#cues li.inline-editing");
+  if (!li) return;
+  setTimeout(() => {
+    if (!INL) return;
+    const stillInside = document.activeElement && document.activeElement.closest && document.activeElement.closest("#cues li.inline-editing");
+    if (stillInside) return;
+    if (!inlineDirty()){ endInline(true); setHint(""); }
+  }, 60);
+});
+
 $("cues").addEventListener("input", e => {
   if (!INL) return;
   if (e.target && e.target.classList && e.target.classList.contains("say")){
     INL.dirty = true;
-    $("saveHint").textContent = "改动未保存 · 点保存生效";
-    $("saveHint").style.color = "#a8630a";
+    hintDirty();
   }
 });
 document.addEventListener("keydown", e => {
   if (!INL) return;
-  if (e.key === "Escape"){ endInline(true); render(); e.preventDefault(); }
+  if (e.key === "Escape"){ endInline(true); setHint("已取消修改", "var(--ink-3)", 1800); render(); e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter"){ commitInline(); e.preventDefault(); }
 }, true);
 /* ---------- 访客限制 ---------- */
