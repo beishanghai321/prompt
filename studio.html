@@ -684,6 +684,10 @@ html.auth-pending{background:#fff}
   }
   .notefoot label{display:flex;align-items:center;gap:5px;cursor:pointer}
   .notefoot input{accent-color:#0071e3}
+  /* 双击就地编辑 */
+  .cues li.inline-editing{background:#fffdf5;box-shadow:inset 0 0 0 2px #f2d98a;border-radius:12px}
+  .cues li.inline-editing .say{outline:none}
+  .cues li.inline-editing .say:focus{outline:none}
   /* 板块切换过渡 */
   .cues.switching{opacity:.15;transform:translateX(-26px);transition:opacity .16s ease,transform .16s ease}
   .cues{transition:opacity .2s ease,transform .28s cubic-bezier(.16,1,.3,1)}
@@ -795,7 +799,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1104";
+      window.__BUILD = "1127-1550";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1630,6 +1634,7 @@ function resetScrollTop(){
 }
 /* ---------- 切板块：丝滑过渡 ---------- */
 function goSmooth(idx){
+  if (inlineDirty() && !confirm("这一段修改还没保存，确定切换板块并放弃？")) return;
   const target = (idx + BLOCKS.length) % BLOCKS.length;
   if (target === bi){ go(idx); return; }
   // 只给内容区做过渡，不整页动（整页动容易晕）
@@ -1933,7 +1938,7 @@ async function handleFile(f){
 let pushedPrompter = false;
 function enterPrompter(){
   try{ applyGuestLimits(); }catch(_){}
-  try{ if (allView){ startGlobalClock(); } }catch(_){}
+  try{ stopGlobalClock(); paintClock(); }catch(_){}
   try{ if ($("acctBtn")) $("acctBtn").style.display = "none"; }catch(_){}
   try{ paintAccount(); }catch(_){}
   // 每次进入都重置：第一块、全文视图、滚动到顶
@@ -1958,6 +1963,8 @@ function enterPrompter(){
   }, 230);
 }
 function leavePrompter(fromPop){
+  if (inlineDirty() && !confirm("这一段修改还没保存，确定离开并放弃？")) return;
+  try{ endInline(true); }catch(_){}
   pushedPrompter = false;
   try{ if ($("notePanel")) $("notePanel").hidden = true; }catch(_){}   // 回工作台时收起提示面板
   try{ if (FLW.on) stopFollow(); }catch(_){}
@@ -3160,6 +3167,134 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("accMask") && $("accMask").classList.contains("on")) closeAccount();
 });
 try{ paintAccount(); }catch(_){}
+/* ---------- 双击段落就地修改 ---------- */
+let INL = null;   // { bi, ci, gi, original, dirty }
+
+function inlineDirty(){ return !!(INL && INL.dirty); }
+
+function cueIndexOf(li){
+  if (!li) return null;
+  if (li.dataset.gi != null){
+    const gi = +li.dataset.gi;
+    const item = FW && FW.list ? FW.list[gi] : null;
+    if (item) return { bi: item.bi, ci: item.ci, gi };
+  }
+  if (li.dataset.ci != null){
+    const ci = +li.dataset.ci;
+    const guard = 0;
+    // 分块视图：需要反查全局序号
+    let gi = -1;
+    if (FW && FW.list){
+      for (let k = 0; k < FW.list.length; k++){
+        if (FW.list[k].bi === bi && FW.list[k].ci === ci){ gi = k; break; }
+      }
+    }
+    return { bi, ci, gi };
+  }
+  return null;
+}
+
+function endInline(silent){
+  if (!INL) return;
+  const li = document.querySelector(INL.gi >= 0 ? `#cues li[data-gi="${INL.gi}"]` : `#cues li[data-ci="${INL.ci}"]`);
+  if (li){
+    li.classList.remove("inline-editing");
+    const say = li.querySelector(".say");
+    if (say) say.removeAttribute("contenteditable");
+  }
+  if (!silent) INL = null;
+  INL = null;
+}
+
+function startInline(li){
+  if (editing) return;                       // 全屏编辑模式下不冲突
+  const pos = cueIndexOf(li);
+  if (!pos || pos.bi == null || pos.ci == null) return;
+  if (INL && INL.gi === pos.gi){
+    const say0 = li.querySelector(".say");
+    if (say0) say0.focus();
+    return;
+  }
+  if (inlineDirty()){
+    if (!confirm("上一段还没保存，放弃修改？")) return;
+  }
+  endInline(true);
+  INL = { bi: pos.bi, ci: pos.ci, gi: pos.gi, original: BLOCKS[pos.bi].cues[pos.ci][1], dirty: false };
+  li.classList.add("inline-editing");
+  const say = li.querySelector(".say");
+  if (!say) return;
+  say.setAttribute("contenteditable", "true");
+  say.focus();
+  try{
+    const r = document.createRange();
+    r.selectNodeContents(say);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  }catch(_){}
+  $("saveHint").textContent = "正在修改 · 记得点保存";
+  $("saveHint").style.color = "#a8630a";
+}
+
+function commitInline(){
+  if (!INL) return false;
+  const li = document.querySelector(INL.gi >= 0 ? `#cues li[data-gi="${INL.gi}"]` : `#cues li[data-ci="${INL.ci}"]`);
+  const say = li ? li.querySelector(".say") : null;
+  const val = (say ? say.innerText : "").replace(/\n{2,}/g, "\n").trim();
+  const changed = val && val !== INL.original;
+  if (changed){
+    BLOCKS[INL.bi].cues[INL.ci][1] = val;
+  }
+  const keep = { bi: INL.bi, ci: INL.ci, gi: INL.gi };
+  endInline(true);
+  if (!changed) return false;
+
+  bi = keep.bi;                                   // 保持在当前板块，不回第一块
+  try{ followBuild(); }catch(_){}
+  render();
+  saveNow(true);
+  // 回到被编辑的那一段，避免跳回顶部
+  requestAnimationFrame(() => {
+    const li2 = document.querySelector(keep.gi >= 0 ? `#cues li[data-gi="${keep.gi}"]` : `#cues li[data-ci="${keep.ci}"]`);
+    if (li2) li2.scrollIntoView({ block: "center", behavior: "auto" });
+    $("saveHint").textContent = "已保存修改";
+    $("saveHint").style.color = "var(--ink-3)";
+  });
+  return true;
+}
+
+function tryInlineFrom(e){
+  const li = e.target && e.target.closest && e.target.closest("#cues li.start, #cues li.allcue");
+  if (!li || !li.querySelector(".say")) return;
+  if (li.classList.contains("inline-editing")) return;
+  e.preventDefault();
+  startInline(li);
+}
+$("cues").addEventListener("dblclick", tryInlineFrom);
+let lastTap = { t: 0, li: null };
+$("cues").addEventListener("click", e => {
+  const li = e.target && e.target.closest && e.target.closest("#cues li.start, #cues li.allcue");
+  if (!li) return;
+  const now = Date.now();
+  if (e.detail >= 2 || (now - lastTap.t < 420 && lastTap.li === li)){
+    lastTap = { t: 0, li: null };
+    tryInlineFrom(e);
+    return;
+  }
+  lastTap = { t: now, li };
+});
+$("cues").addEventListener("input", e => {
+  if (!INL) return;
+  if (e.target && e.target.classList && e.target.classList.contains("say")){
+    INL.dirty = true;
+    $("saveHint").textContent = "改动未保存 · 点保存生效";
+    $("saveHint").style.color = "#a8630a";
+  }
+});
+document.addEventListener("keydown", e => {
+  if (!INL) return;
+  if (e.key === "Escape"){ endInline(true); render(); e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter"){ commitInline(); e.preventDefault(); }
+}, true);
 /* ---------- 访客限制 ---------- */
 function isGuest(){
   try{ return sessionStorage.getItem("tyc_role") === "guest"; }catch(_){ return false; }
@@ -3244,6 +3379,7 @@ function applyViewLabel(){
   document.body.classList.toggle("allview", allView || followView);
 }
 function setAllView(v){
+  if (inlineDirty() && !confirm("这一段修改还没保存，确定切换视图并放弃？")) return;
   allView = !!v;
   try{ localStorage.setItem("tyc_allview", allView ? "1" : "0"); }catch(_){}
   applyViewLabel(); document.body.classList.toggle("allview", allView || followView);
@@ -3287,7 +3423,7 @@ function setRail(collapsed){
 $("railToggle").onclick = () => setRail(!$("rail").classList.contains("collapsed"));
 setRail(SS.get("tyc_rail") === "1");
 $("btnEdit").onclick = () => setEditing(!editing);
-$("btnSave").onclick = () => saveNow(true);
+$("btnSave").onclick = () => { if (inlineDirty() || INL) { commitInline(); return; } saveNow(true); };
 $("cues").addEventListener("input", onEditInput);
 $("drop").onclick = () => $("file").click();
 $("file").onchange = e => { const f = e.target.files[0]; if (f) handleFile(f); e.target.value = ""; };
