@@ -636,13 +636,18 @@ html.auth-pending{background:#fff}
   }
   .notepanel[hidden]{display:none}
   .notehead{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:7px 10px;background:#f5f7fa;border-bottom:1px solid #eceff4;
-    font-size:11.5px;color:#6e6e73;cursor:grab;user-select:none;touch-action:none;
+    display:flex;align-items:center;justify-content:flex-end;
+    height:22px;padding:0 8px 0 10px;background:#f5f7fa;border-bottom:1px solid #eceff4;
+    cursor:grab;user-select:none;touch-action:none;position:relative;
   }
+  .notehead .grip{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:34px;height:3px;border-radius:2px;background:#d8dde4;
+  }
+  .notehead:hover .grip{background:#c3cbd5}
   .notehead.dragging{cursor:grabbing}
   .notehead button{
-    border:0;background:none;font-size:15px;line-height:1;color:#9aa0a6;cursor:pointer;padding:0 2px;
+    border:0;background:none;font-size:14px;line-height:1;color:#b6bcc4;cursor:pointer;padding:0 2px;
   }
   .notehead button:hover{color:#1d1d1f}
   .notehead .dot{width:6px;height:6px;border-radius:50%;background:#c7c7cc;margin-right:6px;display:inline-block}
@@ -786,7 +791,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1045";
+      window.__BUILD = "1127-1047";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -976,7 +981,7 @@ html.auth-pending{background:#fff}
   <!-- 给主播的临时提示（可拖动） -->
   <div class="notepanel" id="notePanel" hidden>
     <div class="notehead" id="noteHead">
-      <span>给主播的提示</span>
+      <span class="grip" aria-hidden="true"></span>
       <button id="noteClose" title="收起">×</button>
     </div>
     <textarea id="noteText" placeholder="在这里打字，主播侧屏能看到…&#10;（拖灰色条移动，拖四边/四角改大小）"></textarea>
