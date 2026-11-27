@@ -170,7 +170,83 @@ html.auth-pending{background:#fff}
   .dact{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 
   /* 视图切换过渡 */
-  /* ---------- 账号中心 ---------- */
+  /* ---------- 给主播的临时提示：可拖动、自动保存 ---------- */
+(function(){
+  const panel = $("notePanel"), head = $("noteHead"), ta = $("noteText"), big = $("noteBig");
+  if (!panel) return;
+  const KEY_POS = "tyc_note_pos", KEY_TXT = "tyc_note_text", KEY_BIG = "tyc_note_big";
+
+  function restore(){
+    try{
+      const p = JSON.parse(localStorage.getItem(KEY_POS) || "null");
+      if (p && typeof p.x === "number") place(p.x, p.y);
+      const t = localStorage.getItem(KEY_TXT); if (t !== null) ta.value = t;
+      if (localStorage.getItem(KEY_BIG) === "1"){ panel.classList.add("big"); big.checked = true; }
+    }catch(_){}
+  }
+  function place(x, y){
+    const w = panel.offsetWidth || 300, h = panel.offsetHeight || 140;
+    x = Math.max(6, Math.min(window.innerWidth  - w - 6, x));
+    y = Math.max(6, Math.min(window.innerHeight - h - 6, y));
+    panel.style.left = x + "px";
+    panel.style.top  = y + "px";
+    panel.style.transform = "none";
+    return { x, y };
+  }
+  function open(){
+    panel.hidden = false;
+    if (!panel.dataset.ready){ restore(); panel.dataset.ready = "1"; }
+    // 默认落在下半屏，绝不压住正在念的那几句
+    if (!localStorage.getItem(KEY_POS)){
+      const h = panel.offsetHeight || 140;
+      place(Math.round((window.innerWidth - (panel.offsetWidth||300)) / 2), Math.round(window.innerHeight * 0.68 - h/2));
+    }
+    ta.focus({ preventScroll: true });
+  }
+  function close(){ panel.hidden = true; }
+
+  let drag = null;
+  head.addEventListener("pointerdown", e => {
+    if (e.target.closest("button")) return;
+    const r = panel.getBoundingClientRect();
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    head.classList.add("dragging");
+    head.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  head.addEventListener("pointermove", e => {
+    if (!drag) return;
+    place(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  const stopDrag = () => {
+    if (!drag) return;
+    drag = null; head.classList.remove("dragging");
+    const r = panel.getBoundingClientRect();
+    try{ localStorage.setItem(KEY_POS, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); }catch(_){}
+  };
+  head.addEventListener("pointerup", stopDrag);
+  head.addEventListener("pointercancel", stopDrag);
+
+  let saveT = 0;
+  ta.addEventListener("input", () => {
+    clearTimeout(saveT);
+    saveT = setTimeout(() => { try{ localStorage.setItem(KEY_TXT, ta.value); }catch(_){} }, 300);
+  });
+  big.addEventListener("change", () => {
+    panel.classList.toggle("big", big.checked);
+    try{ localStorage.setItem(KEY_BIG, big.checked ? "1" : "0"); }catch(_){}
+  });
+  $("noteClose").addEventListener("click", close);
+
+  const btn = $("btnNote");
+  if (btn) btn.addEventListener("click", () => { panel.hidden ? open() : close(); });
+
+  window.addEventListener("resize", () => {
+    const r = panel.getBoundingClientRect();
+    if (!panel.hidden) place(r.left, r.top);
+  });
+})();
+/* ---------- 账号中心 ---------- */
   .acct{
     display:flex;align-items:center;gap:9px;height:36px;padding:0 12px 0 6px;border-radius:999px;
     border:1px solid var(--line,#e0e0e0);background:#fff;cursor:pointer;font-family:var(--font);
@@ -487,6 +563,38 @@ html.auth-pending{background:#fff}
     padding:5px 10px;font-size:12px;cursor:pointer;font-family:var(--font);transition:.15s;
   }
   .blkops button:hover{color:var(--blue);border-color:#c7d9f0}
+  /* ---------- 给主播的临时提示 ---------- */
+  .notepanel{
+    position:fixed;left:50%;top:72vh;transform:translateX(-50%);
+    width:300px;z-index:45;background:rgba(255,255,255,.96);
+    border:1px solid #e3e8ef;border-radius:14px;
+    box-shadow:0 18px 44px rgba(16,32,56,.16), 0 2px 6px rgba(16,32,56,.06);
+    overflow:hidden;display:flex;flex-direction:column;
+    -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  }
+  .notepanel[hidden]{display:none}
+  .notehead{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:7px 10px;background:#f5f7fa;border-bottom:1px solid #eceff4;
+    font-size:11.5px;color:#6e6e73;cursor:grab;user-select:none;touch-action:none;
+  }
+  .notehead.dragging{cursor:grabbing}
+  .notehead button{
+    border:0;background:none;font-size:15px;line-height:1;color:#9aa0a6;cursor:pointer;padding:0 2px;
+  }
+  .notehead button:hover{color:#1d1d1f}
+  .notehead .dot{width:6px;height:6px;border-radius:50%;background:#c7c7cc;margin-right:6px;display:inline-block}
+  .notepanel textarea{
+    width:100%;min-height:64px;max-height:200px;resize:vertical;border:0;outline:none;
+    padding:10px 12px;font-family:var(--font);font-size:13.5px;line-height:1.55;color:#1d1d1f;background:transparent;
+  }
+  .notepanel.big textarea{font-size:19px;line-height:1.6;min-height:96px}
+  .notefoot{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 10px 8px;font-size:11px;color:#9aa0a6;
+  }
+  .notefoot label{display:flex;align-items:center;gap:5px;cursor:pointer}
+  .notefoot input{accent-color:#0071e3}
   /* 板块切换过渡 */
   .cues.switching{opacity:.15;transform:translateX(-26px);transition:opacity .16s ease,transform .16s ease}
   .cues{transition:opacity .2s ease,transform .28s cubic-bezier(.16,1,.3,1)}
@@ -597,7 +705,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1033";
+      window.__BUILD = "1127-1037";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -774,6 +882,7 @@ html.auth-pending{background:#fff}
         <button id="btnView" title="切换全文/分块显示">全文</button>
         <button id="btnFollow" title="语音跟读：念到哪，高亮跟到哪">🎤 跟读</button>
         <button id="btnEdit" title="修改台词">编辑</button>
+        <button id="btnNote" title="给主播的临时提示（可拖动）">📌 提示</button>
         <button id="btnSave" title="保存到本机">保存</button>
         <span class="savehint" id="saveHint"></span>
       <span id="buildTag" style="font-size:10.5px;color:#c7c7cc;margin-left:8px"></span>
@@ -783,7 +892,18 @@ html.auth-pending{background:#fff}
   </main>
 </section>
 
-<div class="flash" id="flash"></div>
+  <!-- 给主播的临时提示（可拖动） -->
+  <div class="notepanel" id="notePanel" hidden>
+    <div class="notehead" id="noteHead">
+      <span>给主播的提示</span>
+      <button id="noteClose" title="收起">×</button>
+    </div>
+    <textarea id="noteText" placeholder="在这里打字，主播侧屏能看到…&#10;（拖动上方灰色区域可移动位置）"></textarea>
+    <div class="notefoot">
+      <label><input type="checkbox" id="noteBig" /> 大字</label>
+      <span id="noteTip">自动保存</span>
+    </div>
+  </div><div class="flash" id="flash"></div>
 
 <script>
 /* ================= 0. 入口统一到首页 ================= */
@@ -1735,6 +1855,7 @@ function enterPrompter(){
 }
 function leavePrompter(fromPop){
   pushedPrompter = false;
+  try{ if ($("notePanel")) $("notePanel").hidden = true; }catch(_){}   // 回工作台时收起提示面板
   try{ if (FLW.on) stopFollow(); }catch(_){}
   try{ if ($("acctBtn")) $("acctBtn").style.display = ""; }catch(_){}
   if (!fromPop){ try{ if (history.state && history.state.tyc === "prompter") history.back(); }catch(_){} }
@@ -2032,6 +2153,9 @@ function undoBlockEdit(){
   }catch(_){}
 }
 document.addEventListener("keydown", e => {
+  const ae = document.activeElement;
+  const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable);
+  if (typing) return;                                  // 在输入框里打字时不触发快捷键
   if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "z" && !document.activeElement.isContentEditable){
     e.preventDefault(); undoBlockEdit();
   }
@@ -2705,6 +2829,82 @@ $("cues").addEventListener("scroll", () => {
     }
   });
 }, { passive: true });
+/* ---------- 给主播的临时提示：可拖动、自动保存 ---------- */
+(function(){
+  const panel = $("notePanel"), head = $("noteHead"), ta = $("noteText"), big = $("noteBig");
+  if (!panel) return;
+  const KEY_POS = "tyc_note_pos", KEY_TXT = "tyc_note_text", KEY_BIG = "tyc_note_big";
+
+  function restore(){
+    try{
+      const p = JSON.parse(localStorage.getItem(KEY_POS) || "null");
+      if (p && typeof p.x === "number") place(p.x, p.y);
+      const t = localStorage.getItem(KEY_TXT); if (t !== null) ta.value = t;
+      if (localStorage.getItem(KEY_BIG) === "1"){ panel.classList.add("big"); big.checked = true; }
+    }catch(_){}
+  }
+  function place(x, y){
+    const w = panel.offsetWidth || 300, h = panel.offsetHeight || 140;
+    x = Math.max(6, Math.min(window.innerWidth  - w - 6, x));
+    y = Math.max(6, Math.min(window.innerHeight - h - 6, y));
+    panel.style.left = x + "px";
+    panel.style.top  = y + "px";
+    panel.style.transform = "none";
+    return { x, y };
+  }
+  function open(){
+    panel.hidden = false;
+    if (!panel.dataset.ready){ restore(); panel.dataset.ready = "1"; }
+    // 默认落在下半屏，绝不压住正在念的那几句
+    if (!localStorage.getItem(KEY_POS)){
+      const h = panel.offsetHeight || 140;
+      place(Math.round((window.innerWidth - (panel.offsetWidth||300)) / 2), Math.round(window.innerHeight * 0.68 - h/2));
+    }
+    ta.focus({ preventScroll: true });
+  }
+  function close(){ panel.hidden = true; }
+
+  let drag = null;
+  head.addEventListener("pointerdown", e => {
+    if (e.target.closest("button")) return;
+    const r = panel.getBoundingClientRect();
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    head.classList.add("dragging");
+    head.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  head.addEventListener("pointermove", e => {
+    if (!drag) return;
+    place(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  const stopDrag = () => {
+    if (!drag) return;
+    drag = null; head.classList.remove("dragging");
+    const r = panel.getBoundingClientRect();
+    try{ localStorage.setItem(KEY_POS, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); }catch(_){}
+  };
+  head.addEventListener("pointerup", stopDrag);
+  head.addEventListener("pointercancel", stopDrag);
+
+  let saveT = 0;
+  ta.addEventListener("input", () => {
+    clearTimeout(saveT);
+    saveT = setTimeout(() => { try{ localStorage.setItem(KEY_TXT, ta.value); }catch(_){} }, 300);
+  });
+  big.addEventListener("change", () => {
+    panel.classList.toggle("big", big.checked);
+    try{ localStorage.setItem(KEY_BIG, big.checked ? "1" : "0"); }catch(_){}
+  });
+  $("noteClose").addEventListener("click", close);
+
+  const btn = $("btnNote");
+  if (btn) btn.addEventListener("click", () => { panel.hidden ? open() : close(); });
+
+  window.addEventListener("resize", () => {
+    const r = panel.getBoundingClientRect();
+    if (!panel.hidden) place(r.left, r.top);
+  });
+})();
 /* ---------- 账号中心 ---------- */
 const PROF_KEY = "tyc_profile_v1";
 function loadProfile(){
