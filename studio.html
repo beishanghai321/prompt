@@ -292,7 +292,7 @@ html.auth-pending{background:#fff}
 
   /* 字号：与窗口大小无关，单独记忆 */
   const KEY_FS = "tyc_note_fs";
-  let fs = 15;
+  let fs = 35;                       // 默认大字号，中控屏离得远也看得清
   function applyFs(){
     ta.style.fontSize = fs + "px";
     $("noteFsNow").textContent = String(fs);
@@ -628,7 +628,7 @@ html.auth-pending{background:#fff}
   /* ---------- 给主播的临时提示 ---------- */
   .notepanel{
     position:fixed;left:50%;top:72vh;transform:translateX(-50%);
-    width:300px;z-index:45;background:rgba(255,255,255,.96);
+    width:320px;z-index:45;background:rgba(255,255,255,.96);
     border:1px solid #e3e8ef;border-radius:14px;
     box-shadow:0 18px 44px rgba(16,32,56,.16), 0 2px 6px rgba(16,32,56,.06);
     overflow:hidden;display:flex;flex-direction:column;
@@ -659,6 +659,7 @@ html.auth-pending{background:#fff}
   .notefoot .fsctl span{min-width:20px;text-align:center;font-size:11px;color:#6e6e73}
   /* 八向缩放手柄 */
   .notepanel{min-width:200px;min-height:112px}
+  .notepanel textarea{font-size:35px;line-height:1.4}
   .nh{position:absolute;z-index:3}
   .nh[data-dir="n"]{left:8px;right:8px;top:-3px;height:7px;cursor:ns-resize}
   .nh[data-dir="s"]{left:8px;right:8px;bottom:-3px;height:7px;cursor:ns-resize}
@@ -785,7 +786,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1043";
+      window.__BUILD = "1127-1045";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -2978,7 +2979,7 @@ $("cues").addEventListener("scroll", () => {
 
   /* 字号：与窗口大小无关，单独记忆 */
   const KEY_FS = "tyc_note_fs";
-  let fs = 15;
+  let fs = 35;                       // 默认大字号，中控屏离得远也看得清
   function applyFs(){
     ta.style.fontSize = fs + "px";
     $("noteFsNow").textContent = String(fs);
