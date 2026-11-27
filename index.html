@@ -452,8 +452,10 @@ function go(url){
 /* 去工作台由登录闸门接管（见文件末尾），这里不再直接跳转 */
 document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
   a.addEventListener("click", e => {
+    const href = a.getAttribute("href") || "";
+    if (/studio\.html|提词屏_工作台\.html/.test(href)) return;   // 交给登录闸门处理
     e.preventDefault();
-    const href = a.getAttribute("href");
+
     go(href.indexOf("?") >= 0 ? href + "&from=home" : href + "?from=home");
   });
 });
@@ -496,13 +498,17 @@ document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
   }
 
   function gate(e, href){
-    if (isDev) return;                 // 开发环境不拦
-    pendingTarget = href || NEXT;
-    // 本次会话已登录过 → 直接放行，不再等待任何请求（也就不会闪工作台）
+    const target = href || NEXT;
+    pendingTarget = target;
+    if (e && e.preventDefault) e.preventDefault();   // 一律由这里决定去哪，避免"点了没反应"
+
+    if (isDev){ location.href = target; return; }   // 本地预览直接进
+
+    // 本次会话已登录过 → 直接跳，不再等请求（不会闪工作台）
     let ok = false;
     try { ok = sessionStorage.getItem("tyc_auth") === "1"; } catch(_){}
-    if (ok) return;
-    e.preventDefault();                // 未登录：先拦住，再弹窗
+    if (ok){ location.href = target; return; }
+
     openLogin();
   }
 
