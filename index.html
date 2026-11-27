@@ -584,6 +584,16 @@ document.querySelectorAll('.topbar a[href$=".html"]').forEach(a => {
     }catch(_){}
   })();
 
+  // 切换账号：直接弹窗并清空输入
+  if (/[?&]switch=1/.test(location.search)){
+    openLogin();
+    try{
+      document.getElementById("loginTitle").textContent = "切换账号";
+      user.value = ""; pass.value = "";
+      history.replaceState(null, "", location.pathname + location.hash);
+    }catch(_){}
+  }
+
   // 从工作台被弹回来时，直接弹登录窗（并把参数从地址栏抹掉，避免返回时反复弹）
   if (/[?&]needLogin=1/.test(location.search)){
     openLogin();

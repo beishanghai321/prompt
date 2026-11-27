@@ -161,6 +161,62 @@ html.auth-pending{background:#fff}
   .dact{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 
   /* 视图切换过渡 */
+  /* ---------- 账号中心 ---------- */
+  .acct{
+    display:flex;align-items:center;gap:9px;height:36px;padding:0 12px 0 6px;border-radius:999px;
+    border:1px solid var(--line,#e0e0e0);background:#fff;cursor:pointer;font-family:var(--font);
+    color:var(--ink,#1d1d1f);font-size:13px;transition:border-color .18s ease,box-shadow .18s ease;
+  }
+  .acct:hover{border-color:#c7d9f0;box-shadow:0 2px 10px rgba(16,32,56,.06)}
+  .acct .av{width:24px;height:24px;border-radius:50%;object-fit:cover;background:#eef2f7;display:block;flex:0 0 auto}
+  .acct .av.txt{display:flex;align-items:center;justify-content:center;color:#5b7ea3;font-size:12px;font-weight:600}
+  .acct .nm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .accmask{
+    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+    background:rgba(244,246,250,.55);-webkit-backdrop-filter:blur(24px) saturate(170%);
+    backdrop-filter:blur(24px) saturate(170%);opacity:0;pointer-events:none;transition:opacity .24s ease;
+  }
+  .accmask.on{opacity:1;pointer-events:auto}
+  .acccard{
+    width:min(400px,calc(100vw - 40px));background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.06);
+    border-radius:22px;box-shadow:0 24px 70px rgba(16,32,56,.16);padding:24px;
+    transform:translateY(8px) scale(.99);transition:transform .28s cubic-bezier(.16,1,.3,1);
+  }
+  .accmask.on .acccard{transform:none}
+  .acchead{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .accav{
+    width:64px;height:64px;border-radius:50%;background:#eef2f7;overflow:hidden;position:relative;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
+    color:#7e93a8;font-size:22px;font-weight:600;border:1px solid #e6ebf1;
+  }
+  .accav img{width:100%;height:100%;object-fit:cover;display:block}
+  .accav::after{
+    content:"更换";position:absolute;left:0;right:0;bottom:0;height:18px;background:rgba(16,32,56,.62);
+    color:#fff;font-size:9.5px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s ease;
+  }
+  .accav:hover::after{opacity:1}
+  .accmeta b{display:block;font-size:15px;letter-spacing:-.01em}
+  .accmeta span{font-size:12px;color:var(--muted,#6e6e73)}
+  .accfield label{display:block;font-size:12px;color:var(--muted,#6e6e73);margin:0 0 6px}
+  .accfield input{
+    width:100%;height:40px;padding:0 12px;border:1px solid var(--line,#e0e0e0);border-radius:11px;
+    font-size:14px;font-family:var(--font);color:inherit;background:#fff;outline:none;
+  }
+  .accfield input:focus{border-color:#9fc6ee;box-shadow:0 0 0 3px rgba(0,113,227,.1)}
+  .accactions{display:flex;gap:10px;margin-top:18px}
+  .accactions button{
+    flex:1;height:40px;border-radius:11px;border:1px solid var(--line,#e0e0e0);background:#fff;
+    color:var(--ink,#1d1d1f);font-size:13.5px;font-family:var(--font);cursor:pointer;transition:.16s;
+  }
+  .accactions button.primary{background:var(--blue,#0066cc);border-color:transparent;color:#fff}
+  .accactions button:hover{border-color:#c7d9f0}
+  .accactions button.primary:hover{background:#0071e3;border-color:transparent}
+  .accactions button.danger{color:#c0392b;border-color:#eed6d2}
+  .accactions button.danger:hover{background:#fdf4f3;border-color:#e6bdb7}
+  .accfoot{display:flex;justify-content:space-between;margin-top:14px}
+  .accfoot button{background:none;border:0;color:var(--muted,#6e6e73);font-size:12.5px;font-family:var(--font);cursor:pointer;padding:4px}
+  .accfoot button:hover{color:var(--ink,#1d1d1f)}
+  .acctip{margin-top:10px;font-size:11.5px;color:var(--muted,#6e6e73);line-height:1.5}
   #setup{transition:opacity .24s ease,transform .24s ease}
   #setup.leaving{opacity:0;transform:translateY(-10px);pointer-events:none}
   #prompter{opacity:0;transform:translateY(14px);transition:opacity .3s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1)}
@@ -532,7 +588,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1023";
+      window.__BUILD = "1127-1026";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -576,7 +632,11 @@ html.auth-pending{background:#fff}
       <h1>直播提词 <span>工作台</span></h1>
       <div class="sub">拖入 docx 脚本，或粘贴文字，生成后直接开播。</div>
     </div>
-    <a class="homebtn" href="index.html" title="返回首页">
+    <button class="acct" id="acctBtn" title="账号中心">
+      <span class="av txt" id="acctAvText">A</span>
+      <img class="av" id="acctAvImg" alt="" style="display:none" />
+      <span class="nm" id="acctName">Arvea</span>
+    </button>    <a class="homebtn" href="index.html" title="返回首页">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M19 12H6M11.5 5.5L5 12l6.5 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
@@ -1636,6 +1696,7 @@ async function handleFile(f){
 let pushedPrompter = false;
 function enterPrompter(){
   try{ applyGuestLimits(); }catch(_){}
+  try{ paintAccount(); }catch(_){}
   // 每次进入都重置：第一块、全文视图、滚动到顶
   try{
     allView = true;
@@ -2628,6 +2689,97 @@ $("cues").addEventListener("scroll", () => {
     }
   });
 }, { passive: true });
+/* ---------- 账号中心 ---------- */
+const PROF_KEY = "tyc_profile_v1";
+function loadProfile(){
+  try{ return JSON.parse(localStorage.getItem(PROF_KEY) || "{}") || {}; }catch(_){ return {}; }
+}
+function saveProfile(o){
+  try{ localStorage.setItem(PROF_KEY, JSON.stringify(o)); }catch(_){}
+}
+function currentRole(){
+  try{ return sessionStorage.getItem("tyc_role") === "guest" ? "guest" : "owner"; }catch(_){ return "owner"; }
+}
+function paintAccount(){
+  const prof = loadProfile();
+  const role = currentRole();
+  const fallbackName = role === "guest" ? "访客" : "Arvea";
+  const name = (prof.name || "").trim() || fallbackName;
+
+  const chipName = $("acctName"); if (chipName) chipName.textContent = name;
+  const chipTxt = $("acctAvText"), chipImg = $("acctAvImg");
+  if (chipTxt && chipImg){
+    if (prof.avatar){ chipImg.src = prof.avatar; chipImg.style.display = "block"; chipTxt.style.display = "none"; }
+    else { chipImg.style.display = "none"; chipTxt.style.display = "flex"; chipTxt.textContent = name.slice(0,1).toUpperCase(); }
+  }
+  const letter = $("accAvLetter"), pic = $("accAvPic");
+  if (letter && pic){
+    if (prof.avatar){ pic.src = prof.avatar; pic.style.display = "block"; letter.style.display = "none"; }
+    else { pic.style.display = "none"; letter.style.display = "flex"; letter.textContent = name.slice(0,1).toUpperCase(); }
+  }
+  const nm = $("accNameInput"); if (nm) nm.value = prof.name || "";
+  const roleEl = $("accRole"); if (roleEl) roleEl.textContent = role === "guest" ? "访客身份" : "已登录 · 管理员";
+}
+
+function openAccount(){ const m = $("accMask"); if (!m) return; paintAccount(); m.classList.add("on"); m.setAttribute("aria-hidden","false"); }
+function closeAccount(){ const m = $("accMask"); if (!m) return; m.classList.remove("on"); m.setAttribute("aria-hidden","true"); }
+
+async function logoutAccount(goSwitch){
+  const target = goSwitch ? "index.html?switch=1" : "index.html?needLogin=1";
+  try{ await fetch("/api/login", { method:"DELETE" }); }catch(_){}
+  try{
+    sessionStorage.removeItem("tyc_auth");
+    sessionStorage.removeItem("tyc_role");
+    sessionStorage.removeItem("tyc_ai_left");
+  }catch(_){}
+  location.replace(target);
+}
+
+/* 头像：缩放成 220×220 的 webp，控制体积 */
+function handleAvatarFile(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const S = 220;
+      const cv = document.createElement("canvas");
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext("2d");
+      const side = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width - side)/2, (img.height - side)/2, side, side, 0, 0, S, S);
+      let url = "";
+      try{ url = cv.toDataURL("image/webp", 0.86); }catch(_){ url = cv.toDataURL("image/jpeg", 0.86); }
+      const prof = loadProfile(); prof.avatar = url; saveProfile(prof); paintAccount();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (!(t && t.closest)) return;
+  if (t.closest("#acctBtn")){ openAccount(); return; }
+  if (t.closest("#accClose")){ closeAccount(); return; }
+  if (t.closest("#accAvBox")){ $("accFile").click(); return; }
+  if (t.closest("#accSave")){
+    const prof = loadProfile();
+    prof.name = ($("accNameInput").value || "").trim().slice(0,16);
+    saveProfile(prof); paintAccount(); closeAccount();
+    followStatus ? followStatus("账号信息已保存", false) : 0;
+    return;
+  }
+  if (t.closest("#accSwitch")){ logoutAccount(true); return; }
+  if (t.closest("#accLogout")){ logoutAccount(false); return; }
+});
+document.addEventListener("change", e => {
+  if (e.target && e.target.id === "accFile"){ handleAvatarFile(e.target.files && e.target.files[0]); e.target.value = ""; }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("accMask") && $("accMask").classList.contains("on")) closeAccount();
+});
+try{ paintAccount(); }catch(_){}
 /* ---------- 访客限制 ---------- */
 function isGuest(){
   try{ return sessionStorage.getItem("tyc_role") === "guest"; }catch(_){ return false; }
@@ -2847,6 +2999,37 @@ document.querySelectorAll('a[href$=".html"]').forEach(a => {
   renderHist();
 })();
 </script>
+<div class="accmask" id="accMask" aria-hidden="true">
+  <div class="acccard" role="dialog" aria-modal="true" aria-labelledby="accTitle">
+    <div class="acchead">
+      <div class="accav" id="accAvBox" title="点击上传头像">
+        <span id="accAvLetter">A</span>
+        <img id="accAvPic" alt="" style="display:none" />
+      </div>
+      <div class="accmeta">
+        <b id="accTitle">账号中心</b>
+        <span id="accRole">已登录</span>
+      </div>
+    </div>
+
+    <div class="accfield">
+      <label for="accNameInput">显示名称</label>
+      <input id="accNameInput" type="text" maxlength="16" placeholder="给自己起个名字" />
+    </div>
+
+    <div class="accactions">
+      <button class="primary" id="accSave">保存</button>
+      <button id="accClose">关闭</button>
+    </div>
+
+    <div class="accfoot">
+      <button id="accSwitch">切换账号</button>
+      <button id="accLogout" class="danger" style="background:none;border:0;color:#c0392b">退出登录</button>
+    </div>
+    <p class="acctip">头像与显示名称只保存在这台电脑的浏览器里，不会上传服务器。访客身份也可自定义头像。</p>
+    <input type="file" id="accFile" accept="image/*" style="display:none" />
+  </div>
+</div>
     <!-- 视图切换确认 -->
     <div class="asrmask" id="viewAsk" hidden>
       <div class="asrmodal" style="width:min(400px,calc(100vw - 40px))">
