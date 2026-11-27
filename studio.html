@@ -799,7 +799,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1550";
+      window.__BUILD = "1127-1558";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -3496,9 +3496,14 @@ $("btnDemo").onclick = () => {
 
 document.addEventListener("keydown", e=>{
   if (!document.getElementById("prompter").classList.contains("on")) return;
-  if (e.target && e.target.tagName === "TEXTAREA"){
-    if (e.key === "Escape") e.target.blur();
-    return;                       // 编辑中不触发切换/计时快捷键
+  const tgt = e.target;
+  const typing = tgt && (
+    tgt.tagName === "TEXTAREA" || tgt.tagName === "INPUT" ||
+    tgt.isContentEditable || (tgt.closest && tgt.closest('[contenteditable="true"]'))
+  );
+  if (typing){
+    if (e.key === "Escape" && tgt.blur) tgt.blur();
+    return;                       // 在任何输入/就地编辑状态下都不触发快捷键
   }
   const ol = $("cues");
   if (e.code === "Space"){ e.preventDefault(); toggle(); }
