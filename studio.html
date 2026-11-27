@@ -6,6 +6,63 @@
 <title>直播提词 · 工作台</title>
 <link rel="icon" href="assets/logo-mark.svg" />
 <style>
+/* ---------- 账号中心 ---------- */
+  .acct{
+    display:flex;align-items:center;gap:9px;height:36px;padding:0 12px 0 6px;border-radius:999px;
+    border:1px solid var(--line,#e0e0e0);background:#fff;cursor:pointer;font-family:var(--font);
+    color:var(--ink,#1d1d1f);font-size:13px;transition:border-color .18s ease,box-shadow .18s ease;
+  }
+  .acct:hover{border-color:#c7d9f0;box-shadow:0 2px 10px rgba(16,32,56,.06)}
+  .acct .av{width:24px;height:24px;border-radius:50%;object-fit:cover;background:#eef2f7;display:block;flex:0 0 auto}
+  .acct .av.txt{display:flex;align-items:center;justify-content:center;color:#5b7ea3;font-size:12px;font-weight:600}
+  .acct .nm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .accmask{
+    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+    background:rgba(244,246,250,.55);-webkit-backdrop-filter:blur(24px) saturate(170%);
+    backdrop-filter:blur(24px) saturate(170%);opacity:0;pointer-events:none;transition:opacity .24s ease;
+  }
+  .accmask.on{opacity:1;pointer-events:auto}
+  .acccard{
+    width:min(400px,calc(100vw - 40px));background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.06);
+    border-radius:22px;box-shadow:0 24px 70px rgba(16,32,56,.16);padding:24px;
+    transform:translateY(8px) scale(.99);transition:transform .28s cubic-bezier(.16,1,.3,1);
+  }
+  .accmask.on .acccard{transform:none}
+  .acchead{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .accav{
+    width:64px;height:64px;border-radius:50%;background:#eef2f7;overflow:hidden;position:relative;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
+    color:#7e93a8;font-size:22px;font-weight:600;border:1px solid #e6ebf1;
+  }
+  .accav img{width:100%;height:100%;object-fit:cover;display:block}
+  .accav::after{
+    content:"更换";position:absolute;left:0;right:0;bottom:0;height:18px;background:rgba(16,32,56,.62);
+    color:#fff;font-size:9.5px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s ease;
+  }
+  .accav:hover::after{opacity:1}
+  .accmeta b{display:block;font-size:15px;letter-spacing:-.01em}
+  .accmeta span{font-size:12px;color:var(--muted,#6e6e73)}
+  .accfield label{display:block;font-size:12px;color:var(--muted,#6e6e73);margin:0 0 6px}
+  .accfield input{
+    width:100%;height:40px;padding:0 12px;border:1px solid var(--line,#e0e0e0);border-radius:11px;
+    font-size:14px;font-family:var(--font);color:inherit;background:#fff;outline:none;
+  }
+  .accfield input:focus{border-color:#9fc6ee;box-shadow:0 0 0 3px rgba(0,113,227,.1)}
+  .accactions{display:flex;gap:10px;margin-top:18px}
+  .accactions button{
+    flex:1;height:40px;border-radius:11px;border:1px solid var(--line,#e0e0e0);background:#fff;
+    color:var(--ink,#1d1d1f);font-size:13.5px;font-family:var(--font);cursor:pointer;transition:.16s;
+  }
+  .accactions button.primary{background:var(--blue,#0066cc);border-color:transparent;color:#fff}
+  .accactions button:hover{border-color:#c7d9f0}
+  .accactions button.primary:hover{background:#0071e3;border-color:transparent}
+  .accactions button.danger{color:#c0392b;border-color:#eed6d2}
+  .accactions button.danger:hover{background:#fdf4f3;border-color:#e6bdb7}
+  .accfoot{display:flex;justify-content:space-between;margin-top:14px}
+  .accfoot button{background:none;border:0;color:var(--muted,#6e6e73);font-size:12.5px;font-family:var(--font);cursor:pointer;padding:4px}
+  .accfoot button:hover{color:var(--ink,#1d1d1f)}
+  .acctip{margin-top:10px;font-size:11.5px;color:var(--muted,#6e6e73);line-height:1.5}
+
 html.auth-pending body{visibility:hidden !important}
 html.auth-pending{background:#fff}
 @font-face{font-family:"Arvea Text";font-style:normal;font-weight:400;font-display:swap;src:url("assets/fonts/SFProPingFangSC-Regular.woff2") format("woff2")}
@@ -172,7 +229,7 @@ html.auth-pending{background:#fff}
   /* 视图切换过渡 */
   /* ---------- 给主播的临时提示：可拖动、自动保存 ---------- */
 (function(){
-  const panel = $("notePanel"), head = $("noteHead"), ta = $("noteText"), big = $("noteBig");
+  const panel = $("notePanel"), head = $("noteHead"), ta = $("noteText");
   if (!panel) return;
   const KEY_POS = "tyc_note_pos", KEY_TXT = "tyc_note_text", KEY_BIG = "tyc_note_big";
 
@@ -181,7 +238,7 @@ html.auth-pending{background:#fff}
       const p = JSON.parse(localStorage.getItem(KEY_POS) || "null");
       if (p && typeof p.x === "number") place(p.x, p.y);
       const t = localStorage.getItem(KEY_TXT); if (t !== null) ta.value = t;
-      if (localStorage.getItem(KEY_BIG) === "1"){ panel.classList.add("big"); big.checked = true; }
+
     }catch(_){}
   }
   function place(x, y){
@@ -211,7 +268,7 @@ html.auth-pending{background:#fff}
     const r = panel.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
     head.classList.add("dragging");
-    head.setPointerCapture(e.pointerId);
+    try{ head.setPointerCapture(e.pointerId); }catch(_){}
     e.preventDefault();
   });
   head.addEventListener("pointermove", e => {
@@ -232,10 +289,70 @@ html.auth-pending{background:#fff}
     clearTimeout(saveT);
     saveT = setTimeout(() => { try{ localStorage.setItem(KEY_TXT, ta.value); }catch(_){} }, 300);
   });
-  big.addEventListener("change", () => {
-    panel.classList.toggle("big", big.checked);
-    try{ localStorage.setItem(KEY_BIG, big.checked ? "1" : "0"); }catch(_){}
+
+  /* 字号：与窗口大小无关，单独记忆 */
+  const KEY_FS = "tyc_note_fs";
+  let fs = 15;
+  function applyFs(){
+    ta.style.fontSize = fs + "px";
+    $("noteFsNow").textContent = String(fs);
+    try{ localStorage.setItem(KEY_FS, String(fs)); }catch(_){}
+  }
+  try{ const v = parseInt(localStorage.getItem(KEY_FS) || "", 10); if (v >= 11 && v <= 40) fs = v; }catch(_){}
+  applyFs();
+  $("noteFsDown").addEventListener("click", () => { fs = Math.max(11, fs - 1); applyFs(); });
+  $("noteFsUp").addEventListener("click", () => { fs = Math.min(40, fs + 1); applyFs(); });
+
+  /* 八向缩放 */
+  const KEY_SIZE = "tyc_note_size";
+  (function(){
+    try{
+      const sz = JSON.parse(localStorage.getItem(KEY_SIZE) || "null");
+      if (sz && sz.w){ panel.style.width = sz.w + "px"; panel.style.height = sz.h + "px"; }
+    }catch(_){}
+  })();
+
+  let rz = null;
+  panel.querySelectorAll(".nh").forEach(h => {
+    h.addEventListener("pointerdown", e => {
+      e.preventDefault(); e.stopPropagation();
+      const r = panel.getBoundingClientRect();
+      rz = { dir: h.dataset.dir, x0: e.clientX, y0: e.clientY, left: r.left, top: r.top, w: r.width, h: r.height };
+      panel.classList.add("sizing");
+      try{ h.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    h.addEventListener("pointermove", e => {
+      if (!rz) return;
+      const dx = e.clientX - rz.x0, dy = e.clientY - rz.y0;
+      let { left, top, w, h: hh } = rz;
+      const MINW = 200, MINH = 112;
+      if (rz.dir.includes("e")) w = Math.max(MINW, rz.w + dx);
+      if (rz.dir.includes("s")) hh = Math.max(MINH, rz.h + dy);
+      if (rz.dir.includes("w")){ w = Math.max(MINW, rz.w - dx); left = rz.left + (rz.w - w); }
+      if (rz.dir.includes("n")){ hh = Math.max(MINH, rz.h - dy); top = rz.top + (rz.h - hh); }
+      w = Math.min(w, window.innerWidth - 12);
+      hh = Math.min(hh, window.innerHeight - 12);
+      left = Math.max(4, Math.min(left, window.innerWidth - w - 4));
+      top = Math.max(4, Math.min(top, window.innerHeight - hh - 4));
+      panel.style.width = w + "px";
+      panel.style.height = hh + "px";
+      panel.style.left = left + "px";
+      panel.style.top = top + "px";
+      panel.style.transform = "none";
+    });
+    const end = () => {
+      if (!rz) return;
+      rz = null; panel.classList.remove("sizing");
+      const r = panel.getBoundingClientRect();
+      try{
+        localStorage.setItem(KEY_SIZE, JSON.stringify({ w: Math.round(r.width), h: Math.round(r.height) }));
+        localStorage.setItem(KEY_POS, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) }));
+      }catch(_){}
+    };
+    h.addEventListener("pointerup", end);
+    h.addEventListener("pointercancel", end);
   });
+
   $("noteClose").addEventListener("click", close);
 
   const btn = $("btnNote");
@@ -246,62 +363,7 @@ html.auth-pending{background:#fff}
     if (!panel.hidden) place(r.left, r.top);
   });
 })();
-/* ---------- 账号中心 ---------- */
-  .acct{
-    display:flex;align-items:center;gap:9px;height:36px;padding:0 12px 0 6px;border-radius:999px;
-    border:1px solid var(--line,#e0e0e0);background:#fff;cursor:pointer;font-family:var(--font);
-    color:var(--ink,#1d1d1f);font-size:13px;transition:border-color .18s ease,box-shadow .18s ease;
-  }
-  .acct:hover{border-color:#c7d9f0;box-shadow:0 2px 10px rgba(16,32,56,.06)}
-  .acct .av{width:24px;height:24px;border-radius:50%;object-fit:cover;background:#eef2f7;display:block;flex:0 0 auto}
-  .acct .av.txt{display:flex;align-items:center;justify-content:center;color:#5b7ea3;font-size:12px;font-weight:600}
-  .acct .nm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .accmask{
-    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
-    background:rgba(244,246,250,.55);-webkit-backdrop-filter:blur(24px) saturate(170%);
-    backdrop-filter:blur(24px) saturate(170%);opacity:0;pointer-events:none;transition:opacity .24s ease;
-  }
-  .accmask.on{opacity:1;pointer-events:auto}
-  .acccard{
-    width:min(400px,calc(100vw - 40px));background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.06);
-    border-radius:22px;box-shadow:0 24px 70px rgba(16,32,56,.16);padding:24px;
-    transform:translateY(8px) scale(.99);transition:transform .28s cubic-bezier(.16,1,.3,1);
-  }
-  .accmask.on .acccard{transform:none}
-  .acchead{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-  .accav{
-    width:64px;height:64px;border-radius:50%;background:#eef2f7;overflow:hidden;position:relative;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
-    color:#7e93a8;font-size:22px;font-weight:600;border:1px solid #e6ebf1;
-  }
-  .accav img{width:100%;height:100%;object-fit:cover;display:block}
-  .accav::after{
-    content:"更换";position:absolute;left:0;right:0;bottom:0;height:18px;background:rgba(16,32,56,.62);
-    color:#fff;font-size:9.5px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s ease;
-  }
-  .accav:hover::after{opacity:1}
-  .accmeta b{display:block;font-size:15px;letter-spacing:-.01em}
-  .accmeta span{font-size:12px;color:var(--muted,#6e6e73)}
-  .accfield label{display:block;font-size:12px;color:var(--muted,#6e6e73);margin:0 0 6px}
-  .accfield input{
-    width:100%;height:40px;padding:0 12px;border:1px solid var(--line,#e0e0e0);border-radius:11px;
-    font-size:14px;font-family:var(--font);color:inherit;background:#fff;outline:none;
-  }
-  .accfield input:focus{border-color:#9fc6ee;box-shadow:0 0 0 3px rgba(0,113,227,.1)}
-  .accactions{display:flex;gap:10px;margin-top:18px}
-  .accactions button{
-    flex:1;height:40px;border-radius:11px;border:1px solid var(--line,#e0e0e0);background:#fff;
-    color:var(--ink,#1d1d1f);font-size:13.5px;font-family:var(--font);cursor:pointer;transition:.16s;
-  }
-  .accactions button.primary{background:var(--blue,#0066cc);border-color:transparent;color:#fff}
-  .accactions button:hover{border-color:#c7d9f0}
-  .accactions button.primary:hover{background:#0071e3;border-color:transparent}
-  .accactions button.danger{color:#c0392b;border-color:#eed6d2}
-  .accactions button.danger:hover{background:#fdf4f3;border-color:#e6bdb7}
-  .accfoot{display:flex;justify-content:space-between;margin-top:14px}
-  .accfoot button{background:none;border:0;color:var(--muted,#6e6e73);font-size:12.5px;font-family:var(--font);cursor:pointer;padding:4px}
-  .accfoot button:hover{color:var(--ink,#1d1d1f)}
-  .acctip{margin-top:10px;font-size:11.5px;color:var(--muted,#6e6e73);line-height:1.5}
+
   #setup{transition:opacity .24s ease,transform .24s ease}
   #setup.leaving{opacity:0;transform:translateY(-10px);pointer-events:none}
   #prompter{opacity:0;transform:translateY(14px);transition:opacity .3s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1)}
@@ -585,10 +647,28 @@ html.auth-pending{background:#fff}
   .notehead button:hover{color:#1d1d1f}
   .notehead .dot{width:6px;height:6px;border-radius:50%;background:#c7c7cc;margin-right:6px;display:inline-block}
   .notepanel textarea{
-    width:100%;min-height:64px;max-height:200px;resize:vertical;border:0;outline:none;
+    width:100%;flex:1 1 auto;min-height:56px;resize:none;border:0;outline:none;
     padding:10px 12px;font-family:var(--font);font-size:13.5px;line-height:1.55;color:#1d1d1f;background:transparent;
   }
-  .notepanel.big textarea{font-size:19px;line-height:1.6;min-height:96px}
+  .notefoot .fsctl{display:flex;align-items:center;gap:6px;color:#6e6e73}
+  .notefoot .fsctl button{
+    width:22px;height:20px;border-radius:6px;border:1px solid #e3e8ef;background:#fff;color:#6e6e73;
+    font-size:10.5px;line-height:1;cursor:pointer;padding:0;
+  }
+  .notefoot .fsctl button:hover{color:#0066cc;border-color:#c7d9f0}
+  .notefoot .fsctl span{min-width:20px;text-align:center;font-size:11px;color:#6e6e73}
+  /* 八向缩放手柄 */
+  .notepanel{min-width:200px;min-height:112px}
+  .nh{position:absolute;z-index:3}
+  .nh[data-dir="n"]{left:8px;right:8px;top:-3px;height:7px;cursor:ns-resize}
+  .nh[data-dir="s"]{left:8px;right:8px;bottom:-3px;height:7px;cursor:ns-resize}
+  .nh[data-dir="w"]{top:8px;bottom:8px;left:-3px;width:7px;cursor:ew-resize}
+  .nh[data-dir="e"]{top:8px;bottom:8px;right:-3px;width:7px;cursor:ew-resize}
+  .nh[data-dir="nw"]{left:-4px;top:-4px;width:15px;height:15px;cursor:nwse-resize}
+  .nh[data-dir="ne"]{right:-4px;top:-4px;width:15px;height:15px;cursor:nesw-resize}
+  .nh[data-dir="sw"]{left:-4px;bottom:-4px;width:15px;height:15px;cursor:nesw-resize}
+  .nh[data-dir="se"]{right:-4px;bottom:-4px;width:15px;height:15px;cursor:nwse-resize}
+  .notepanel.sizing, .notepanel.sizing *{user-select:none}
   .notefoot{
     display:flex;align-items:center;justify-content:space-between;
     padding:6px 10px 8px;font-size:11px;color:#9aa0a6;
@@ -672,7 +752,7 @@ html.auth-pending{background:#fff}
   .flash.on{display:block;animation:soft 1.6s ease-in-out infinite}
   @keyframes soft{50%{opacity:.35}}
 </style>
-<<script>
+<script>
 /* ---------- 会话守卫：先藏住页面，验证通过才显示 ---------- */
 (function(){
   var forceProd = /[?&]prod=1/.test(location.search);     // 调试用：强制按生产环境走
@@ -705,7 +785,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1037";
+      window.__BUILD = "1127-1043";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -898,11 +978,15 @@ html.auth-pending{background:#fff}
       <span>给主播的提示</span>
       <button id="noteClose" title="收起">×</button>
     </div>
-    <textarea id="noteText" placeholder="在这里打字，主播侧屏能看到…&#10;（拖动上方灰色区域可移动位置）"></textarea>
+    <textarea id="noteText" placeholder="在这里打字，主播侧屏能看到…&#10;（拖灰色条移动，拖四边/四角改大小）"></textarea>
     <div class="notefoot">
-      <label><input type="checkbox" id="noteBig" /> 大字</label>
+      <span class="fsctl"><button id="noteFsDown" title="字号变小">A−</button><span id="noteFsNow">15</span><button id="noteFsUp" title="字号变大">A+</button></span>
       <span id="noteTip">自动保存</span>
     </div>
+    <div class="nh" data-dir="n"></div><div class="nh" data-dir="s"></div>
+    <div class="nh" data-dir="w"></div><div class="nh" data-dir="e"></div>
+    <div class="nh" data-dir="nw"></div><div class="nh" data-dir="ne"></div>
+    <div class="nh" data-dir="sw"></div><div class="nh" data-dir="se"></div>
   </div><div class="flash" id="flash"></div>
 
 <script>
@@ -2831,7 +2915,7 @@ $("cues").addEventListener("scroll", () => {
 }, { passive: true });
 /* ---------- 给主播的临时提示：可拖动、自动保存 ---------- */
 (function(){
-  const panel = $("notePanel"), head = $("noteHead"), ta = $("noteText"), big = $("noteBig");
+  const panel = $("notePanel"), head = $("noteHead"), ta = $("noteText");
   if (!panel) return;
   const KEY_POS = "tyc_note_pos", KEY_TXT = "tyc_note_text", KEY_BIG = "tyc_note_big";
 
@@ -2840,7 +2924,7 @@ $("cues").addEventListener("scroll", () => {
       const p = JSON.parse(localStorage.getItem(KEY_POS) || "null");
       if (p && typeof p.x === "number") place(p.x, p.y);
       const t = localStorage.getItem(KEY_TXT); if (t !== null) ta.value = t;
-      if (localStorage.getItem(KEY_BIG) === "1"){ panel.classList.add("big"); big.checked = true; }
+
     }catch(_){}
   }
   function place(x, y){
@@ -2870,7 +2954,7 @@ $("cues").addEventListener("scroll", () => {
     const r = panel.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
     head.classList.add("dragging");
-    head.setPointerCapture(e.pointerId);
+    try{ head.setPointerCapture(e.pointerId); }catch(_){}
     e.preventDefault();
   });
   head.addEventListener("pointermove", e => {
@@ -2891,10 +2975,70 @@ $("cues").addEventListener("scroll", () => {
     clearTimeout(saveT);
     saveT = setTimeout(() => { try{ localStorage.setItem(KEY_TXT, ta.value); }catch(_){} }, 300);
   });
-  big.addEventListener("change", () => {
-    panel.classList.toggle("big", big.checked);
-    try{ localStorage.setItem(KEY_BIG, big.checked ? "1" : "0"); }catch(_){}
+
+  /* 字号：与窗口大小无关，单独记忆 */
+  const KEY_FS = "tyc_note_fs";
+  let fs = 15;
+  function applyFs(){
+    ta.style.fontSize = fs + "px";
+    $("noteFsNow").textContent = String(fs);
+    try{ localStorage.setItem(KEY_FS, String(fs)); }catch(_){}
+  }
+  try{ const v = parseInt(localStorage.getItem(KEY_FS) || "", 10); if (v >= 11 && v <= 40) fs = v; }catch(_){}
+  applyFs();
+  $("noteFsDown").addEventListener("click", () => { fs = Math.max(11, fs - 1); applyFs(); });
+  $("noteFsUp").addEventListener("click", () => { fs = Math.min(40, fs + 1); applyFs(); });
+
+  /* 八向缩放 */
+  const KEY_SIZE = "tyc_note_size";
+  (function(){
+    try{
+      const sz = JSON.parse(localStorage.getItem(KEY_SIZE) || "null");
+      if (sz && sz.w){ panel.style.width = sz.w + "px"; panel.style.height = sz.h + "px"; }
+    }catch(_){}
+  })();
+
+  let rz = null;
+  panel.querySelectorAll(".nh").forEach(h => {
+    h.addEventListener("pointerdown", e => {
+      e.preventDefault(); e.stopPropagation();
+      const r = panel.getBoundingClientRect();
+      rz = { dir: h.dataset.dir, x0: e.clientX, y0: e.clientY, left: r.left, top: r.top, w: r.width, h: r.height };
+      panel.classList.add("sizing");
+      try{ h.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    h.addEventListener("pointermove", e => {
+      if (!rz) return;
+      const dx = e.clientX - rz.x0, dy = e.clientY - rz.y0;
+      let { left, top, w, h: hh } = rz;
+      const MINW = 200, MINH = 112;
+      if (rz.dir.includes("e")) w = Math.max(MINW, rz.w + dx);
+      if (rz.dir.includes("s")) hh = Math.max(MINH, rz.h + dy);
+      if (rz.dir.includes("w")){ w = Math.max(MINW, rz.w - dx); left = rz.left + (rz.w - w); }
+      if (rz.dir.includes("n")){ hh = Math.max(MINH, rz.h - dy); top = rz.top + (rz.h - hh); }
+      w = Math.min(w, window.innerWidth - 12);
+      hh = Math.min(hh, window.innerHeight - 12);
+      left = Math.max(4, Math.min(left, window.innerWidth - w - 4));
+      top = Math.max(4, Math.min(top, window.innerHeight - hh - 4));
+      panel.style.width = w + "px";
+      panel.style.height = hh + "px";
+      panel.style.left = left + "px";
+      panel.style.top = top + "px";
+      panel.style.transform = "none";
+    });
+    const end = () => {
+      if (!rz) return;
+      rz = null; panel.classList.remove("sizing");
+      const r = panel.getBoundingClientRect();
+      try{
+        localStorage.setItem(KEY_SIZE, JSON.stringify({ w: Math.round(r.width), h: Math.round(r.height) }));
+        localStorage.setItem(KEY_POS, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) }));
+      }catch(_){}
+    };
+    h.addEventListener("pointerup", end);
+    h.addEventListener("pointercancel", end);
   });
+
   $("noteClose").addEventListener("click", close);
 
   const btn = $("btnNote");
