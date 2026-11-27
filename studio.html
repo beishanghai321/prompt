@@ -473,20 +473,20 @@ html.auth-pending{background:#fff}
 
   .stage{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;padding:22px 34px 0}
   .head{
-    display:grid;grid-template-columns:1fr auto;grid-template-areas:"clock clock" "ttl tools";align-items:end;row-gap:8px;column-gap:16px;
+    display:flex;align-items:center;gap:16px;
     width:100%;max-width:1400px;margin:0 auto;
     padding-bottom:14px;border-bottom:1px solid var(--line);flex:0 0 auto;
   }
 
-  .head .ttl{grid-area:ttl;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;justify-self:start}
+  .head .ttl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
   .head .num{font-size:clamp(24px,3.4vh,40px);font-weight:600;color:var(--blue);letter-spacing:-.02em;line-height:1}
   .head h1{font-size:clamp(20px,2.9vh,32px);font-weight:600;letter-spacing:-.02em;color:var(--ink)}
   .head .win{
     font-size:clamp(11px,1.4vh,14px);color:var(--blue);font-weight:500;
     background:var(--blue-soft);border-radius:980px;padding:5px 12px;white-space:nowrap;
   }
-  .clock{grid-area:clock;justify-self:center;text-align:center;min-width:150px;margin:0}
-  .head .toolbar{grid-area:tools;display:flex;align-items:center;gap:10px;justify-self:end}
+  .clock{text-align:center;min-width:132px;margin-left:auto;flex:0 0 auto}
+  .head .toolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto}
   .clock .t{
     font-variant-numeric:tabular-nums;font-size:clamp(22px,3.4vh,40px);font-weight:600;letter-spacing:-.01em;
     font-feature-settings:"tnum";color:var(--ink);line-height:1;
@@ -795,7 +795,7 @@ html.auth-pending{background:#fff}
 <body>
     <div id="errBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:999;background:#b3261e;color:#fff;font:12px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;padding:8px 14px;white-space:pre-wrap"></div>
     <script>
-      window.__BUILD = "1127-1056";
+      window.__BUILD = "1127-1101";
       (function(){
         function show(msg){
           var b = document.getElementById("errBar");
@@ -1604,12 +1604,12 @@ function paintClock(){
   const b = BLOCKS[bi];
   const t = $("clockT"), bar = $("clockBar");
   if (followView || allView){                        // 全文/跟读：全局正计时，从 0 往上走
-    const sec = Math.max(0, Math.floor((Date.now() - (FW_START || Date.now())) / 1000));
+    const sec = Math.max(0, Math.floor(globalElapsedMs() / 1000));
     t.textContent = fmt(sec);
     t.className = "t";
     bar.style.width = "100%";
     $("flash").className = "flash";
-    $("clockHint").textContent = (followView ? "跟读中" : "全程") + " · 已用时";
+    $("clockHint").textContent = (GLOBAL_RUN ? "计时中" : "已暂停") + " · 空格开始/暂停 · R 归零";
     return;
   }
   t.textContent = left >= 0 ? fmt(left) : "-" + fmt(-left);
@@ -1653,8 +1653,14 @@ function goSmooth(idx){
 }
 function go(idx){ bi = (idx + BLOCKS.length) % BLOCKS.length; left = BLOCKS[bi].dur; render(); resetScrollTop(); if (running) tickStart(); }
 function tickStart(){ clearInterval(timer); timer = setInterval(()=>{ if (allView || followView){ paintClock(); return; } left -= 1; paintClock(); }, 1000); }
-function toggle(){ running = !running; if (running) tickStart(); else clearInterval(timer); paintClock(); }
-function reset(){ left = BLOCKS[bi].dur; paintClock(); }
+function toggle(){
+  if (allView || followView){ GLOBAL_RUN ? pauseGlobalClock() : startGlobalClock(); return; }
+  running = !running; if (running) tickStart(); else clearInterval(timer); paintClock();
+}
+function reset(){
+  if (allView || followView){ resetGlobalClock(); return; }
+  left = BLOCKS[bi].dur; paintClock();
+}
 
 let fsVh = parseFloat(localStorage.getItem("tyc_fs") || "2.1");
 if (!(fsVh >= 1.2 && fsVh <= 4.2)) fsVh = 2.1;
@@ -2460,7 +2466,7 @@ function stopFollow(){
   try{ localAsrStop(); }catch(_){}
   if (FLW.rec){ try { FLW.rec.onend = null; FLW.rec.stop(); } catch(_){} FLW.rec = null; }
   $("btnFollow").classList.remove("on");
-  try{ followView = false; document.body.classList.toggle("allview", allView); clearInterval(fwClockTimer); fwClockTimer = null; render(); paintClock(); }catch(_){}
+  try{ followView = false; document.body.classList.toggle("allview", allView); pauseGlobalClock(); clearInterval(fwClockTimer); fwClockTimer = null; render(); paintClock(); }catch(_){}
   $("btnFollow").textContent = "跟读";
   followStatus("");
   renderRead();
@@ -2864,7 +2870,7 @@ function localAsrStop(){
 }
 function startFollow(){
   try{ followView = true; document.body.classList.add("allview"); FW_START = Date.now(); if (!FW) followBuild(); render(); paintClock();
-    clearInterval(fwClockTimer); fwClockTimer = setInterval(paintClock, 1000); }catch(_){}
+    GLOBAL_RUN = false; GLOBAL_ACC = 0; startGlobalClock(); }catch(_){}
   const useLocal = /[?&]asr=local/.test(location.search) || asrPref() === "local";
   if (useLocal){
     FLW.on = true; FLW.ptr = 0; FLW.cue = -1; FLW.transcript = ""; FLW.pausedUntil = 0;
@@ -3202,15 +3208,32 @@ function applyGuestLimits(){
 
   updateGuestTip();
 }
-/* 全文视图：全局正计时（从 0 开始） */
+/* 全文视图：全局正计时（从 0 开始，可暂停/归零） */
+let GLOBAL_RUN = false, GLOBAL_ACC = 0;
+function globalElapsedMs(){
+  return GLOBAL_ACC + (GLOBAL_RUN && FW_START ? Date.now() - FW_START : 0);
+}
 function startGlobalClock(){
-  if (!FW_START) FW_START = Date.now();
+  if (GLOBAL_RUN) return;
+  GLOBAL_RUN = true; FW_START = Date.now();
   clearInterval(fwClockTimer);
   fwClockTimer = setInterval(paintClock, 1000);
   paintClock();
 }
+function pauseGlobalClock(){
+  if (!GLOBAL_RUN) return;
+  GLOBAL_ACC = globalElapsedMs(); GLOBAL_RUN = false; FW_START = 0;
+  clearInterval(fwClockTimer); fwClockTimer = null;
+  paintClock();
+}
+function resetGlobalClock(){
+  GLOBAL_ACC = 0;
+  if (GLOBAL_RUN) FW_START = Date.now(); else FW_START = 0;
+  paintClock();
+}
 function stopGlobalClock(){
-  clearInterval(fwClockTimer); fwClockTimer = null; FW_START = 0;
+  clearInterval(fwClockTimer); fwClockTimer = null;
+  GLOBAL_RUN = false; GLOBAL_ACC = 0; FW_START = 0;
 }
 /* ---------- 视图切换：全文 <-> 分块 ---------- */
 function applyViewLabel(){
